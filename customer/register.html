@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Premium Living</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<div class="login-container">
+    <div class="login-box" style="max-width: 550px;">
+        <div class="login-header">
+            <i class="fas fa-user-plus" style="font-size: 3rem; color: var(--accent-gold);"></i>
+            <h1>Create Account</h1>
+            <p>Join Premium Living family</p>
+        </div>
+        <form action="dashboard.html" method="POST">
+            <div class="form-group"><label>Full Name *</label><input type="text" required placeholder="Enter your full name"></div>
+            <div class="form-group"><label>Password *</label><input type="password" required placeholder="Create a password"></div>
+            <div class="form-group"><label>Confirm Password *</label><input type="password" required placeholder="Confirm password"></div>
+            <div class="form-group"><label>Contact Number *</label><input type="tel" required placeholder="Phone number"></div>
+            <div class="form-group"><label>Delivery Address *</label><textarea rows="3" required placeholder="Your full address"></textarea></div>
+            <div class="form-group"><label>Company Name (Optional)</label><input type="text" placeholder="Company name if applicable"></div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;"><i class="fas fa-check-circle"></i> Register</button>
+        </form>
+        <p style="text-align: center; margin-top: 1.5rem;">Already have an account? <a href="login.html" style="color: var(--accent-gold);">Login here</a></p>
+    </div>
+</div>
+</body>
+</html>

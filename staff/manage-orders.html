@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Orders - Premium Living</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 2rem; font-size: 0.7rem; font-weight: 600; }
+        .status-open { background: #e8dccc; color: #5c3d2e; }
+        .status-processing { background: #fef3e2; color: #b47c2e; }
+        .status-approved { background: #e6f4ea; color: #2d6a4f; }
+        .status-pending { background: #fce4d6; color: #9d6b53; }
+        .status-completed { background: #d4e2d4; color: #1b4d3e; }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo"><h1><a href="dashboard.html"><i class="fas fa-tree"></i> Staff Portal</a></h1></div>
+    <ul class="nav-links">
+        <li><a href="dashboard.html">Dashboard</a></li><li><a href="insert-furniture.html">Add Furniture</a></li>
+        <li><a href="insert-material.html">Add Material</a></li><li><a href="manage-orders.html">Manage Orders</a></li>
+        <li><a href="generate-report.html">Reports</a></li><li><a href="delete-furniture.html">Delete Item</a></li>
+        <li><a href="../index.html">Logout</a></li>
+    </ul>
+</nav>
+
+<div class="container">
+    <div class="card">
+        <div class="card-header"><h2><i class="fas fa-clipboard-list"></i> Order Workshop</h2>
+            <div class="filter-bar"><select id="statusFilter" class="filter-select" onchange="filterOrders()"><option value="all">All Orders</option><option value="Open">Open</option><option value="Processing">Processing</option><option value="Approved">Approved</option><option value="Completed">Completed</option></select>
+                <input type="text" id="searchOrder" placeholder="🔍 Search Order..." class="filter-select" onkeyup="filterOrders()"></div>
+        </div>
+        <div class="table-container"><table id="ordersTable"><thead><tr><th>Order ID</th><th>Date</th><th>Item</th><th>Qty</th><th>Total</th><th>Customer</th><th>Delivery</th><th>Status</th><th>Action</th></tr></thead><tbody id="ordersTableBody"></tbody></table></div>
+    </div>
+</div>
+
+<div id="updateModal" class="modal"><div class="modal-content"><div class="modal-header"><h3>Update Order</h3><span class="close" onclick="closeModal()">&times;</span></div>
+    <p>Order: <strong id="modalOid"></strong></p>
+    <div class="form-group"><label>Status</label><select id="modalStatus" class="filter-select"><option>Open</option><option>Processing</option><option>Approved</option><option>Completed</option></select></div>
+    <button class="btn btn-primary" onclick="saveUpdate()">Save Changes</button>
+</div></div>
+
+<script>
+    const orders = [
+        { oid:"#1002", date:"2024-03-10", item:"Oak Chair + Sofa", qty:3, total:4700, customer:"John Doe", delivery:"2024-03-18", status:"Processing" },
+        { oid:"#1003", date:"2024-03-15", item:"Dining Table", qty:1, total:2500, customer:"John Doe", delivery:"2024-03-20", status:"Completed" },
+        { oid:"#1005", date:"2024-03-20", item:"Bookshelf", qty:2, total:2400, customer:"Sarah Wong", delivery:"2024-03-25", status:"Approved" },
+        { oid:"#1006", date:"2024-03-22", item:"Bed Frame", qty:1, total:2200, customer:"Michael Chan", delivery:"2024-03-28", status:"Open" }
+    ];
+    let currentOrder = null;
+
+    function getStatusClass(s) {
+        const map = {Open:'status-open', Processing:'status-processing', Approved:'status-approved', Completed:'status-completed'};
+        return map[s] || 'status-open';
+    }
+
+    function renderOrders() {
+        const filter = document.getElementById('statusFilter').value;
+        const search = document.getElementById('searchOrder').value.toLowerCase();
+        const filtered = orders.filter(o => (filter==='all' || o.status===filter) && o.oid.includes(search));
+        const tbody = document.getElementById('ordersTableBody');
+        tbody.innerHTML = '';
+        filtered.forEach(o => {
+            const row = tbody.insertRow();
+            row.insertCell(0).innerHTML = `<strong>${o.oid}</strong>`;
+            row.insertCell(1).innerText = o.date;
+            row.insertCell(2).innerText = o.item;
+            row.insertCell(3).innerText = o.qty;
+            row.insertCell(4).innerHTML = `<strong>$${o.total}</strong>`;
+            row.insertCell(5).innerText = o.customer;
+            row.insertCell(6).innerText = o.delivery;
+            row.insertCell(7).innerHTML = `<span class="status-badge ${getStatusClass(o.status)}">${o.status}</span>`;
+            row.insertCell(8).innerHTML = `<button class="btn btn-primary" style="padding:0.3rem 0.8rem;" onclick="openModal('${o.oid}')"><i class="fas fa-edit"></i> Edit</button>`;
+        });
+    }
+
+    function openModal(oid) { currentOrder = orders.find(o => o.oid === oid); document.getElementById('modalOid').innerText = oid; document.getElementById('modalStatus').value = currentOrder.status; document.getElementById('updateModal').style.display = 'flex'; }
+    function closeModal() { document.getElementById('updateModal').style.display = 'none'; currentOrder = null; }
+    function saveUpdate() { if(currentOrder) { currentOrder.status = document.getElementById('modalStatus').value; alert(`Order ${currentOrder.oid} updated to ${currentOrder.status}`); closeModal(); renderOrders(); } }
+    function filterOrders() { renderOrders(); }
+    renderOrders();
+    window.onclick = (e) => { if(e.target === document.getElementById('updateModal')) closeModal(); };
+</script>
+<footer><p>&copy; 2024 Premium Living | Woodcraft Excellence</p></footer>
+</body>
+</html>

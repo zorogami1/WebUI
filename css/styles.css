@@ -1,0 +1,615 @@
+/* Premium Living Furniture - Advanced Woody Aesthetic */
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+:root {
+    --wood-dark: #3e2a21;
+    --wood-medium: #5c3d2e;
+    --wood-light: #8b5e3c;
+    --wood-pale: #c4a484;
+    --wood-bg: #f5efe6;
+    --cream: #fdf8f0;
+    --accent-gold: #d4a373;
+    --accent-warm: #e6ccb2;
+    --success-forest: #2d6a4f;
+    --danger-rust: #9d6b53;
+    --warning-amber: #e9b35f;
+    --gray-wood: #a89f91;
+    --shadow-soft: 0 8px 30px rgba(0,0,0,0.08);
+    --shadow-warm: 0 12px 28px rgba(62, 42, 33, 0.12);
+    --radius-card: 1.25rem;
+    --radius-btn: 2rem;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--wood-bg);
+    color: var(--wood-dark);
+    line-height: 1.5;
+    background-image: radial-gradient(circle at 10% 20%, rgba(196, 164, 132, 0.08) 0%, transparent 50%);
+}
+
+/* Typography */
+h1, h2, h3, .logo-text {
+    font-family: 'Playfair Display', serif;
+    letter-spacing: -0.01em;
+}
+
+/* Navigation - Wooden Panel Style */
+.navbar {
+    background: linear-gradient(135deg, var(--wood-dark) 0%, var(--wood-medium) 100%);
+    box-shadow: var(--shadow-warm);
+    padding: 1rem 2.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    border-bottom: 2px solid var(--accent-gold);
+}
+
+.navbar .logo h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+.navbar .logo a {
+    color: var(--cream);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.navbar .logo a i {
+    color: var(--accent-gold);
+    font-size: 1.8rem;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    gap: 2rem;
+    flex-wrap: wrap;
+}
+
+.nav-links a {
+    color: var(--cream);
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: all 0.25s;
+    padding: 0.5rem 0;
+    border-bottom: 2px solid transparent;
+}
+
+.nav-links a:hover {
+    color: var(--accent-gold);
+    border-bottom-color: var(--accent-gold);
+}
+
+/* Container */
+.container {
+    max-width: 1400px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+}
+
+/* Cards - Wood Grain Effect */
+.card {
+    background: var(--cream);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+    padding: 1.8rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(139, 94, 60, 0.15);
+    transition: transform 0.25s ease, box-shadow 0.25s;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-warm);
+}
+
+.card-header {
+    border-bottom: 2px solid var(--wood-pale);
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.card-header h2 {
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--wood-dark);
+}
+
+.card-header h2 i {
+    color: var(--accent-gold);
+    margin-right: 0.6rem;
+}
+
+/* Form Elements - Rustic Touch */
+.form-group {
+    margin-bottom: 1.3rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--wood-dark);
+    font-size: 0.9rem;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: 1.5px solid #e2d5c0;
+    border-radius: 1rem;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    background: white;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.2);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.2rem;
+}
+
+/* Buttons - Warm & Inviting */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1.6rem;
+    border-radius: var(--radius-btn);
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.25s;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    justify-content: center;
+    font-family: 'Inter', sans-serif;
+}
+
+.btn-primary {
+    background: var(--wood-medium);
+    color: white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.btn-primary:hover {
+    background: var(--wood-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(62, 42, 33, 0.25);
+}
+
+.btn-success {
+    background: var(--success-forest);
+    color: white;
+}
+
+.btn-success:hover {
+    background: #1b4d3e;
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background: var(--danger-rust);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #7a4c38;
+}
+
+.btn-warning {
+    background: var(--warning-amber);
+    color: var(--wood-dark);
+}
+
+.btn-secondary {
+    background: var(--wood-pale);
+    color: var(--wood-dark);
+}
+
+.btn-secondary:hover {
+    background: var(--accent-gold);
+    color: white;
+}
+
+/* Tables - Elegant Wood Style */
+.table-container {
+    overflow-x: auto;
+    border-radius: 1rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+table th {
+    background: var(--wood-medium);
+    color: var(--cream);
+    padding: 1rem;
+    font-weight: 600;
+    font-family: 'Playfair Display', serif;
+}
+
+table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e8dccc;
+    vertical-align: middle;
+}
+
+table tr:hover {
+    background: #faf3e8;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.8rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: var(--cream);
+    padding: 1.6rem;
+    border-radius: var(--radius-card);
+    text-align: center;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid rgba(139, 94, 60, 0.1);
+    transition: all 0.25s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent-gold);
+}
+
+.stat-number {
+    font-size: 2.3rem;
+    font-weight: 800;
+    color: var(--wood-dark);
+    font-family: 'Playfair Display', serif;
+}
+
+.stat-number i {
+    color: var(--accent-gold);
+    font-size: 2rem;
+}
+
+.stat-label {
+    color: var(--wood-light);
+    margin-top: 0.6rem;
+    font-weight: 500;
+}
+
+/* Product Grid - Gallery Style */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.product-card {
+    background: white;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    transition: all 0.3s;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid #e8dccc;
+}
+
+.product-card:hover {
+    transform: translateY(-8px);
+    box-shadow: var(--shadow-warm);
+}
+
+.product-image {
+    height: 220px;
+    background: #f5efe6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+}
+
+.product-card:hover .product-image img {
+    transform: scale(1.05);
+}
+
+.product-info {
+    padding: 1.2rem;
+}
+
+.product-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--wood-dark);
+}
+
+.product-price {
+    color: var(--wood-light);
+    font-size: 1.3rem;
+    font-weight: bold;
+}
+
+.product-desc {
+    color: #8a7a6a;
+    font-size: 0.85rem;
+    margin: 0.5rem 0;
+}
+
+/* Login Container - Forest Cabin Vibe */
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #2d1f16 0%, #4a3222 100%);
+    position: relative;
+}
+
+.login-container::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><path fill="rgba(212,163,115,0.08)" d="M100 0 L200 200 L0 200 Z"/></svg>');
+    background-size: 300px;
+    opacity: 0.3;
+}
+
+.login-box {
+    background: var(--cream);
+    border-radius: 2rem;
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 450px;
+    box-shadow: 0 25px 45px rgba(0,0,0,0.3);
+    border: 1px solid var(--accent-gold);
+    position: relative;
+    z-index: 1;
+}
+
+.login-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.login-header h1 {
+    color: var(--wood-dark);
+    font-size: 2rem;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(62, 42, 33, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: var(--cream);
+    margin: auto;
+    padding: 2rem;
+    width: 90%;
+    max-width: 500px;
+    border-radius: 1.5rem;
+    animation: fadeUp 0.25s ease;
+    border: 1px solid var(--accent-gold);
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(25px);}
+    to { opacity: 1; transform: translateY(0);}
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.2rem;
+}
+
+.close {
+    cursor: pointer;
+    font-size: 1.8rem;
+    color: var(--wood-light);
+    transition: color 0.2s;
+}
+
+.close:hover {
+    color: var(--danger-rust);
+}
+
+/* Badges */
+.badge-success, .badge-delivered {
+    background: #e6f4ea;
+    color: var(--success-forest);
+    padding: 0.25rem 0.9rem;
+    border-radius: 2rem;
+    font-weight: 600;
+    font-size: 0.75rem;
+    display: inline-block;
+}
+
+.badge-warning, .badge-processing {
+    background: #fef3e2;
+    color: var(--warning-amber);
+}
+
+.badge-completed {
+    background: #e6f4ea;
+    color: var(--success-forest);
+}
+
+/* Filter Bar */
+.filter-bar {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.filter-select {
+    padding: 0.6rem 1rem;
+    border: 1.5px solid #e2d5c0;
+    border-radius: 2rem;
+    background: white;
+    font-size: 0.9rem;
+}
+
+/* Sort Controls */
+.sort-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+/* Material List */
+.material-list {
+    font-size: 0.75rem;
+    background: #faf3e8;
+    padding: 0.6rem;
+    border-radius: 1rem;
+}
+
+.material-item {
+    background: white;
+    padding: 0.4rem 0.7rem;
+    margin: 0.3rem 0;
+    border-radius: 1rem;
+    border-left: 3px solid var(--accent-gold);
+    font-size: 0.7rem;
+}
+
+/* Alert Messages */
+.alert {
+    padding: 1rem;
+    border-radius: 1rem;
+    margin-bottom: 1rem;
+}
+
+.alert-success {
+    background: #e6f4ea;
+    color: var(--success-forest);
+    border-left: 4px solid var(--success-forest);
+}
+
+.alert-warning {
+    background: #fef3e2;
+    color: #8a5a2a;
+    border-left: 4px solid var(--warning-amber);
+}
+
+/* Footer */
+footer {
+    background: var(--wood-dark);
+    color: var(--wood-pale);
+    text-align: center;
+    padding: 1.6rem;
+    margin-top: 3rem;
+    border-top: 2px solid var(--accent-gold);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .navbar {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem;
+    }
+    .nav-links {
+        justify-content: center;
+        gap: 1rem;
+    }
+    .container {
+        padding: 0 1rem;
+    }
+    .card-header {
+        flex-direction: column;
+        align-items: start;
+        gap: 0.8rem;
+    }
+    .product-grid {
+        grid-template-columns: 1fr;
+    }
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Chart Containers */
+.chart-container {
+    background: var(--cream);
+    border-radius: var(--radius-card);
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: var(--shadow-soft);
+    border: 1px solid rgba(139, 94, 60, 0.1);
+}
+
+/* Quantity Input */
+.qty-input {
+    width: 80px;
+    padding: 0.4rem 0.6rem;
+    border-radius: 1rem;
+    border: 1.5px solid #e2d5c0;
+    text-align: center;
+}
+
+/* Product Thumbnail */
+.product-thumb {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 0.75rem;
+}

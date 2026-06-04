@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insert Material - Premium Living Furniture</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo">
+        <h1><a href="dashboard.html">🏠 Premium Living - Staff Portal</a></h1>
+    </div>
+    <ul class="nav-links">
+        <li><a href="dashboard.html">Dashboard</a></li>
+        <li><a href="insert-furniture.html">Insert Furniture</a></li>
+        <li><a href="insert-material.html">Insert Material</a></li>
+        <li><a href="manage-orders.html">Manage Orders</a></li>
+        <li><a href="generate-report.html">Generate Report</a></li>
+        <li><a href="delete-furniture.html">Delete Furniture</a></li>
+        <li><a href="../index.html">Logout</a></li>
+    </ul>
+</nav>
+
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2>Add New Material</h2>
+            <p>Material ID will be generated automatically</p>
+        </div>
+        <form action="dashboard.html" method="POST">
+            <div class="form-group">
+                <label for="mname">Material Name *</label>
+                <input type="text" id="mname" name="mname" required placeholder="Enter material name">
+            </div>
+            <div class="form-group">
+                <label for="mqty">Physical Quantity *</label>
+                <input type="number" id="mqty" name="mqty" required placeholder="Enter quantity">
+            </div>
+            <div class="form-group">
+                <label for="munit">Unit *</label>
+                <select id="munit" name="munit" required>
+                    <option value="">Select Unit</option>
+                    <option value="pcs">Pieces (pcs)</option>
+                    <option value="meter">Meter (m)</option>
+                    <option value="block">Block</option>
+                    <option value="kg">Kilogram (kg)</option>
+                    <option value="liter">Liter (L)</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Add Material</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Current Materials Inventory</h2>
+        </div>
+        <div class="table-container">
+            <table>
+                <thead>
+                <tr><th>Material ID</th><th>Material Name</th><th>Quantity</th><th>Unit</th></tr>
+                </thead>
+                <tbody>
+                <tr><td>1</td><td>Oak Wood Plank</td><td>500</td><td>pcs</td></tr>
+                <tr><td>2</td><td>Steel Tube</td><td>200</td><td>meter</td></tr>
+                <tr><td>3</td><td>Fabric Cloth</td><td>100</td><td>meter</td></tr>
+                <tr><td>4</td><td>High Density Foam</td><td>50</td><td>block</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<footer>
+    <p>&copy; 2024 Premium Living Furniture Co. Ltd. All rights reserved.</p>
+</footer>
+</body>
+</html>
