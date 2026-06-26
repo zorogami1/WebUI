@@ -2,21 +2,44 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-// Route security guard protection
-if (!isset($_SESSION['cid'])) {
+
+if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-require_once '../conn.php';
+$message = "";
+$message_type = "";
 
-try {
-    // Fetch live furniture catalog data from database
-    $stmt = $pdo->prepare("SELECT * FROM Furnitures ORDER BY fid ASC");
-    $stmt->execute();
-    $furnitures = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    die("Error loading premium catalog products: " . $e->getMessage());
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['action'] === 'place_order') {
+    $servername = "localhost";
+    $db_username = "root";
+    $db_password = "";
+    $dbname = "createprojectdb";
+
+    $conn = new mysqli($servername, $db_username, $db_password, $dbname);
+
+    if ($conn->connect_error) {
+        $message = "Database connection failure: " . $conn->connect_error;
+        $message_type = "alert-warning";
+    } else {
+        $user_id = $_SESSION['user_id'];
+        $product_id = intval($_POST['product_id']);
+
+        $stmt = $conn->prepare("INSERT INTO orders (user_id, product_id, status) VALUES (?, ?, 'Pending')");
+        $stmt->bind_param("ii", $user_id, $product_id);
+
+        if ($stmt->execute()) {
+            $message = "Order placed successfully! Track its status on your dashboard.";
+            $message_type = "alert-success";
+        } else {
+            $message = "Error creating order record: " . $stmt->error;
+            $message_type = "alert-warning";
+        }
+
+        $stmt->close();
+        $conn->close();
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -29,15 +52,22 @@ try {
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body>
+
 <nav class="navbar">
-    <div class="logo"><h1><a href="dashboard.php"><i class="fas fa-tree"></i> Premium Living</a></h1></div>
+    <div class="logo">
+        <a href="dashboard.php">
+            <i class="fas fa-tree"></i>
+            <h1>Premium Living</h1>
+        </a>
+    </div>
     <ul class="nav-links">
-        <li><a href="dashboard.php">Dashboard</a></li>
-        <li><a href="make-order.php" class="active">Make Order</a></li>
-        <li><a href="view-orders.php">Orders</a></li>
-        <li><a href="update-profile.php">Profile</a></li>
-        <li><a href="delete-order.php">Delete Order</a></li>
-        <li><a href="../index.php">Logout</a></li>
+        <li><a href="../index.php"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="dashboard.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+        <li><a href="make-order.php"><i class="fas fa-shopping-cart"></i> Make Order</a></li>
+        <li><a href="view-orders.php"><i class="fas fa-list"></i> Orders</a></li>
+        <li><a href="update-profile.php"><i class="fas fa-user-edit"></i> Profile</a></li>
+        <li><a href="delete-order.php"><i class="fas fa-trash"></i> Delete Order</a></li>
+        <li><a href="../index.php?action=logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
     </ul>
 </nav>
 
@@ -45,57 +75,47 @@ try {
     <div class="card">
         <div class="card-header">
             <h2><i class="fas fa-cart-plus"></i> Our Handcrafted Collection</h2>
-            <p>Welcome back, <strong><?php echo htmlspecialchars($_SESSION['cname']); ?></strong>! Select items below to build your custom artisanal order.</p>
         </div>
 
-        <form action="place-order.php" method="POST">
-            <div style="margin-bottom: 2rem; background: #fdfaf4; padding: 1.5rem; border-radius: 8px; border: 1px dashed #8b5e3c;">
-                <h3 style="margin-top: 0; color: #3e2a21;"><i class="fas fa-truck"></i> Delivery Specifications</h3>
-                <div class="form-group">
-                    <label for="delivery_date">Scheduled Delivery Date *</label>
-                    <input type="date" id="delivery_date" name="delivery_date" required min="<?php echo date('Y-m-d', strtotime('+1 day')); ?>">
+        <?php if (!empty($message)): ?>
+            <div class="alert <?php echo $message_type; ?>">
+                <?php echo $message; ?>
+            </div>
+        <?php endif; ?>
+
+        <div class="product-grid">
+            <?php
+            $products = [
+                    1 => ["title" => "Oak Dining Chair", "price" => "$450", "desc" => "Solid oak, timeless elegance", "img" => "1.png"],
+                    2 => ["title" => "Large Dining Table", "price" => "$2,500", "desc" => "Seats 6, modern design", "img" => "2.png"],
+                    3 => ["title" => "3-Seater Fabric Sofa", "price" => "$3,800", "desc" => "Premium comfort", "img" => "3.png"],
+                    4 => ["title" => "Wooden Wardrobe", "price" => "$1,800", "desc" => "Spacious, elegant storage", "img" => "4.png"],
+                    5 => ["title" => "Industrial Bookshelf", "price" => "$1,200", "desc" => "Modern steel frame", "img" => "5.png"],
+                    6 => ["title" => "Queen Size Bed Frame", "price" => "$2,200", "desc" => "Sturdy, timeless design", "img" => "6.png"]
+            ];
+
+            foreach ($products as $id => $p):
+                ?>
+                <div class="product-card">
+                    <div class="product-image"><img src="../images/<?php echo $p['img']; ?>" alt="<?php echo $p['title']; ?>"></div>
+                    <div class="product-info">
+                        <div class="product-title"><?php echo $p['title']; ?></div>
+                        <div class="product-price"><?php echo $p['price']; ?></div>
+                        <div class="product-desc"><?php echo $p['desc']; ?></div>
+                        <form action="" method="POST">
+                            <input type="hidden" name="action" value="place_order">
+                            <input type="hidden" name="product_id" value="<?php echo $id; ?>">
+                            <button type="submit" class="btn btn-primary"><i class="fas fa-cart-plus"></i> Buy Now</button>
+                        </form>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="delivery_address">Delivery Address for This Order *</label>
-                    <textarea id="delivery_address" name="delivery_address" rows="2" required placeholder="Defaults to profile profile address or enter new destination structural target"></textarea>
-                </div>
-            </div>
-
-            <div class="product-grid">
-                <?php if (empty($furnitures)): ?>
-                    <p>No artisanal item collections are currently available in our system database.</p>
-                <?php else: ?>
-                    <?php foreach ($furnitures as $item): ?>
-                        <div class="product-card">
-                            <div class="product-image">
-                                <img src="../images/<?php echo $item['fid']; ?>.png" alt="<?php echo htmlspecialchars($item['fname']); ?>" onerror="this.src='../images/placeholder.png';">
-                            </div>
-                            <div class="product-info">
-                                <div class="product-title"><?php echo htmlspecialchars($item['fname']); ?></div>
-                                <div class="product-price">$<?php echo number_format($item['fprice'], 2); ?></div>
-                                <div class="product-desc"><?php echo htmlspecialchars($item['fdesc']); ?></div>
-
-                                <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem; justify-content: center;">
-                                    <label style="font-size: 0.85rem; color: #555;">Qty:</label>
-                                    <input type="number" name="quantity[<?php echo $item['fid']; ?>]" value="0" min="0" max="20" style="width: 60px; padding: 0.25rem; text-align: center; border-radius: 4px; border: 1px solid #ccc;">
-                                </div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </div>
-
-            <div style="text-align: center; margin-top: 2.5rem;">
-                <button type="submit" class="btn btn-primary" style="padding: 1rem 3rem; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
-                    <i class="fas fa-file-invoice-dollar"></i> Review and Place Order
-                </button>
-            </div>
-        </form>
+            <?php endforeach; ?>
+        </div>
     </div>
 </div>
 
 <footer>
-    <p>&copy; 2026 Premium Living Furniture | Sustainably Crafted</p>
+    <p>&copy; 2026 Premium Living | Woodcraft Excellence</p>
 </footer>
 </body>
 </html>

@@ -1,7 +1,23 @@
 <?php
-// Start a session to track if a user logs in later
+// Secure session layer initialization
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
+
+// SELF-CONTAINED LOGOUT ENGINE: Intercepts action tag without needing a separate file
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    $_SESSION = array(); // Clear data array
+
+    if (ini_get("session.use_cookies")) {
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', time() - 42000,
+                $params["path"], $params["domain"],
+                $params["secure"], $params["httponly"]
+        );
+    }
+    session_destroy(); // Terminate server tracking
+    header("Location: index.php"); // Clean redirect to logged-out state
+    exit();
 }
 ?>
 <!DOCTYPE html>
@@ -13,7 +29,6 @@ if (session_status() === PHP_SESSION_NONE) {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="css/styles.css">
     <style>
-        /* Additional layout enhancements for index only */
         .hero-section {
             background: linear-gradient(135deg, #3e2a21 0%, #5c3d2e 100%);
             border-radius: var(--radius-card);
@@ -163,21 +178,21 @@ if (session_status() === PHP_SESSION_NONE) {
 <body>
 <nav class="navbar">
     <div class="logo">
-        <h1><a href="index.php"><i class="fas fa-tree"></i> Premium Living Furniture</a></h1>
+        <h1><a href="index.php"><i class="fas fa-tree"></i> Premium Living</a></h1>
     </div>
     <ul class="nav-links">
         <li><a href="index.php"><i class="fas fa-home"></i> Home</a></li>
 
         <?php if(isset($_SESSION['user_id'])): ?>
-            <?php if($_SESSION['role'] === 'staff'): ?>
+            <?php if(isset($_SESSION['role']) && $_SESSION['role'] === 'staff'): ?>
                 <li><a href="staff/dashboard.php"><i class="fas fa-desktop"></i> Staff Dashboard</a></li>
             <?php else: ?>
                 <li><a href="customer/dashboard.php"><i class="fas fa-user-circle"></i> My Account</a></li>
             <?php endif; ?>
-            <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+            <li><a href="index.php?action=logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
         <?php else: ?>
-            <li><a href="customer/login.php"><i class="fas fa-user"></i> Customer Portal</a></li>
-            <li><a href="staff/login.php"><i class="fas fa-briefcase"></i> Staff Portal</a></li>
+            <li><a href="staff/register.html"><i class="fas fa-user-plus"></i> Register</a></li>
+            <li><a href="customer/login.php"><i class="fas fa-sign-in-alt"></i> Portal Login</a></li>
         <?php endif; ?>
     </ul>
 </nav>
@@ -186,15 +201,26 @@ if (session_status() === PHP_SESSION_NONE) {
     <div class="container">
         <div class="hero-section">
             <div class="hero-content">
-                <span class="hero-badge"><i class="fas fa-leaf"></i> Since 2004</span>
-                <h1 class="hero-title">Handcrafted <span>Wooden Furniture</span><br>For Generations</h1>
-                <p class="hero-desc">Every piece tells a story. Sustainably sourced solid wood, traditional joinery, and timeless designs that bring warmth to your home.</p>
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                    <a href="staff/register.html" class="btn btn-primary" style="background: var(--accent-gold); color: var(--wood-dark);"><i class="fas fa-user-plus"></i> Join Us / Register</a>
-                    <?php if(!isset($_SESSION['user_id'])): ?>
-                        <a href="customer/login.php" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;"><i class="fas fa-sign-in-alt"></i> Customer Login</a>
-                    <?php endif; ?>
-                </div>
+                <?php if(isset($_SESSION['user_id'])): ?>
+                    <span class="hero-badge"><i class="fas fa-user-check"></i> Welcome Back</span>
+                    <h1 class="hero-title">Your Premium <span>Living Spaces</span><br>Await</h1>
+                    <p class="hero-desc">Explore the catalog collection below or jump straight into your personalized profile dashboard system to track your orders.</p>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <?php if(isset($_SESSION['role']) && $_SESSION['role'] === 'staff'): ?>
+                            <a href="staff/dashboard.php" class="btn btn-primary" style="background: var(--accent-gold); color: var(--wood-dark);"><i class="fas fa-desktop"></i> Go to Staff Dashboard</a>
+                        <?php else: ?>
+                            <a href="customer/dashboard.php" class="btn btn-primary" style="background: var(--accent-gold); color: var(--wood-dark);"><i class="fas fa-user-circle"></i> View My Account</a>
+                        <?php endif; ?>
+                    </div>
+                <?php else: ?>
+                    <span class="hero-badge"><i class="fas fa-leaf"></i> Since 2004</span>
+                    <h1 class="hero-title">Handcrafted <span>Wooden Furniture</span><br>For Generations</h1>
+                    <p class="hero-desc">Every piece tells a story. Sustainably sourced solid wood, traditional joinery, and timeless designs that bring warmth to your home.</p>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <a href="staff/register.html" class="btn btn-primary" style="background: var(--accent-gold); color: var(--wood-dark);"><i class="fas fa-user-plus"></i> Join Us / Register</a>
+                        <a href="customer/login.php" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;"><i class="fas fa-sign-in-alt"></i> Member Login</a>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -291,9 +317,8 @@ if (session_status() === PHP_SESSION_NONE) {
 
 <script>
     function redirectToOrder() {
-        // Maps nicely to customer/make-order.html found in your directory
         sessionStorage.setItem('redirectAfterLogin', 'customer/make-order.html');
-        window.location.href = 'customer/login.php';
+        window.location.href = 'customer/login.html';
     }
 
     document.querySelectorAll('.btn-primary, .btn-secondary').forEach(btn => {

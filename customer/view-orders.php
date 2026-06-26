@@ -2,89 +2,119 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-if (!isset($_SESSION['cid'])) {
+
+if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
 }
 
-require_once '../conn.php';
+$user_id = $_SESSION['user_id'];
+$servername = "localhost";
+$db_username = "root";
+$db_password = "";
+$dbname = "createprojectdb";
 
-$customer_id = $_SESSION['cid'];
+$conn = new mysqli($servername, $db_username, $db_password, $dbname);
+$orders = [];
 
-try {
-    // Pull full matching transaction records owned by this individual account holder
-    $sql = "SELECT * FROM Orders WHERE cid = :cid ORDER BY odate DESC";
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute(['cid' => $customer_id]);
-    $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    die("Database transaction retrieval error: " . $e->getMessage());
+if (!$conn->connect_error) {
+    $stmt = $conn->prepare("SELECT order_id, product_id, status FROM orders WHERE user_id = ? ORDER BY order_id DESC");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    $conn->close();
 }
 
-// Map database status integer values to clean, matching visual badge components
-function getStatusBadge($statusNum) {
-    switch($statusNum) {
-        case 1:  return '<span class="status-badge" style="background:#e8dccc; color:#5c3d2e; padding:4px 10px; border-radius:12px; font-size:0.75rem;">Open</span>';
-        case 2:  return '<span class="status-badge" style="background:#fef3e2; color:#b47c2e; padding:4px 10px; border-radius:12px; font-size:0.75rem;">Processing</span>';
-        case 3:  return '<span class="status-badge" style="background:#e6f4ea; color:#2d6a4f; padding:4px 10px; border-radius:12px; font-size:0.75rem;">Approved</span>';
-        default: return '<span class="status-badge" style="background:#fce4d6; color:#9d6b53; padding:4px 10px; border-radius:12px; font-size:0.75rem;">Pending</span>';
-    }
-}
+// Product Catalog Mapping Array
+$products_catalog = [
+        1 => "Oak Dining Chair",
+        2 => "Large Dining Table",
+        3 => "3-Seater Fabric Sofa",
+        4 => "Wooden Wardrobe",
+        5 => "Industrial Bookshelf",
+        6 => "Queen Size Bed Frame"
+];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>View Orders - Premium Living</title>
+    <title>Your Orders - Premium Living</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* Forces absolute center alignment across all table elements */
+        table th, table td {
+            text-align: center !important;
+            vertical-align: middle;
+            padding: 1.2rem 1.5rem;
+        }
+
+        /* Center-align the status badge container wrapper */
+        .badge-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
 </head>
 <body>
+
 <nav class="navbar">
-    <div class="logo"><h1><a href="dashboard.php">🏠 Premium Living</a></h1></div>
+    <div class="logo">
+        <a href="dashboard.php">
+            <i class="fas fa-tree"></i>
+            <h1>Premium Living</h1>
+        </a>
+    </div>
     <ul class="nav-links">
-        <li><a href="dashboard.php">Dashboard</a></li>
-        <li><a href="make-order.php">Make Order</a></li>
-        <li><a href="view-orders.php" class="active">View Orders</a></li>
-        <li><a href="update-profile.php">My Profile</a></li>
-        <li><a href="delete-order.php">Delete Order</a></li>
-        <li><a href="../index.php">Logout</a></li>
+        <li><a href="../index.php"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="dashboard.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+        <li><a href="make-order.php"><i class="fas fa-shopping-cart"></i> Make Order</a></li>
+        <li><a href="view-orders.php"><i class="fas fa-list"></i> Orders</a></li>
+        <li><a href="update-profile.php"><i class="fas fa-user-edit"></i> Profile</a></li>
+        <li><a href="delete-order.php"><i class="fas fa-trash"></i> Delete Order</a></li>
+        <li><a href="../index.php?action=logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
     </ul>
 </nav>
 
 <div class="container">
     <div class="card">
         <div class="card-header">
-            <h2>My Order Records</h2>
-            <p>Track history statements and execution processing flags metrics below.</p>
+            <h2><i class="fas fa-boxes"></i> Your Order History</h2>
         </div>
 
         <div class="table-container">
-            <table id="ordersTable">
+            <table>
                 <thead>
                 <tr>
-                    <th>Order ID</th>
-                    <th>Order Date</th>
-                    <th>Scheduled Delivery</th>
-                    <th>Shipping Destination Destination Address</th>
-                    <th>Total Amount</th>
-                    <th>Processing Status</th>
+                    <th style="width: 25%;">Order ID</th>
+                    <th style="width: 50%;">Product Name</th>
+                    <th style="width: 25%;">Status</th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($orders)): ?>
                     <tr>
-                        <td colspan="6" style="text-align: center; padding: 2rem; color: #777;">You haven't placed any artisanal furniture orders yet.</td>
+                        <td colspan="3" style="text-align: center; color: var(--gray-wood); padding: 2rem;">No orders found.</td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($orders as $row): ?>
+                    <?php foreach ($orders as $order):
+                        $p_id = intval($order['product_id']);
+                        $product_name = isset($products_catalog[$p_id]) ? $products_catalog[$p_id] : "Premium Piece (Item ID: " . $p_id . ")";
+                        ?>
                         <tr>
-                            <td><strong>#<?php echo $row['oid']; ?></strong></td>
-                            <td><?php echo date('Y-m-d H:i', strtotime($row['odate'])); ?></td>
-                            <td><?php echo date('Y-m-d', strtotime($row['odeliverydate'])); ?></td>
-                            <td><?php echo htmlspecialchars($row['odeliveraddress']); ?></td>
-                            <td><strong style="color: #8b5e3c;">$<?php echo number_format($row['ototalamount'], 2); ?></strong></td>
-                            <td><?php echo getStatusBadge($row['ostatus']); ?></td>
+                            <td><strong>#<?php echo $order['order_id']; ?></strong></td>
+                            <td><?php echo htmlspecialchars($product_name); ?></td>
+                            <td>
+                                <div class="badge-container">
+                                        <span class="badge-success <?php echo ($order['status'] === 'Pending') ? 'badge-warning' : 'badge-completed'; ?>">
+                                            <?php echo htmlspecialchars($order['status']); ?>
+                                        </span>
+                                </div>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php endif; ?>
@@ -95,7 +125,7 @@ function getStatusBadge($statusNum) {
 </div>
 
 <footer>
-    <p>&copy; 2026 Premium Living Furniture Co. Ltd. All rights reserved.</p>
+    <p>&copy; 2026 Premium Living | Woodcraft Excellence</p>
 </footer>
 </body>
 </html>
