@@ -170,14 +170,14 @@ if (session_status() === PHP_SESSION_NONE) {
 
         <?php if(isset($_SESSION['user_id'])): ?>
             <?php if($_SESSION['role'] === 'staff'): ?>
-                <li><a href="staff/dashboard.html"><i class="fas fa-desktop"></i> Staff Dashboard</a></li>
+                <li><a href="staff/dashboard.php"><i class="fas fa-desktop"></i> Staff Dashboard</a></li>
             <?php else: ?>
-                <li><a href="customer/dashboard.html"><i class="fas fa-user-circle"></i> My Account</a></li>
+                <li><a href="customer/dashboard.php"><i class="fas fa-user-circle"></i> My Account</a></li>
             <?php endif; ?>
             <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
         <?php else: ?>
-            <li><a href="customer/login.html"><i class="fas fa-user"></i> Customer Portal</a></li>
-            <li><a href="staff/login.html"><i class="fas fa-briefcase"></i> Staff Portal</a></li>
+            <li><a href="customer/login.php"><i class="fas fa-user"></i> Customer Portal</a></li>
+            <li><a href="staff/login.php"><i class="fas fa-briefcase"></i> Staff Portal</a></li>
         <?php endif; ?>
     </ul>
 </nav>
@@ -192,7 +192,7 @@ if (session_status() === PHP_SESSION_NONE) {
                 <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
                     <a href="staff/register.html" class="btn btn-primary" style="background: var(--accent-gold); color: var(--wood-dark);"><i class="fas fa-user-plus"></i> Join Us / Register</a>
                     <?php if(!isset($_SESSION['user_id'])): ?>
-                        <a href="customer/login.html" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;"><i class="fas fa-sign-in-alt"></i> Customer Login</a>
+                        <a href="customer/login.php" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;"><i class="fas fa-sign-in-alt"></i> Customer Login</a>
                     <?php endif; ?>
                 </div>
             </div>
@@ -293,7 +293,7 @@ if (session_status() === PHP_SESSION_NONE) {
     function redirectToOrder() {
         // Maps nicely to customer/make-order.html found in your directory
         sessionStorage.setItem('redirectAfterLogin', 'customer/make-order.html');
-        window.location.href = 'customer/login.html';
+        window.location.href = 'customer/login.php';
     }
 
     document.querySelectorAll('.btn-primary, .btn-secondary').forEach(btn => {
