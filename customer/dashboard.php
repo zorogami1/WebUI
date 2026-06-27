@@ -18,7 +18,7 @@ $dbname = "createprojectdb";
 
 $conn = new mysqli($servername, $db_username, $db_password, $dbname);
 
-// Product Catalog Mapping & Price Sheet Matrix
+// Product Catalog Mapping
 $products_catalog = [
         1 => ["name" => "Oak Dining Chair", "price" => 450],
         2 => ["name" => "Large Dining Table", "price" => 2500],
@@ -34,9 +34,8 @@ $pending_count = 0;
 $recent_orders = [];
 
 if (!$conn->connect_error) {
-    // 1. Fetch all items matching this user to calculate accurate metric values dynamically
-    // Fixed: Using order_id instead of id
-    $metrics_query = "SELECT order_id, product_id, status FROM orders WHERE user_id = ?";
+    // Fetch all orders for this user - using correct column names
+    $metrics_query = "SELECT oid, status FROM orders WHERE cid = ?";
     $stmt = $conn->prepare($metrics_query);
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
@@ -45,25 +44,37 @@ if (!$conn->connect_error) {
     while ($row = $result->fetch_assoc()) {
         $total_orders++;
 
-        if ($row['status'] === 'Pending') {
+        if ($row['status'] === 'Pending' || $row['status'] === 'Open') {
             $pending_count++;
-        }
-
-        // Sum prices using our catalog map matrix
-        $p_id = intval($row['product_id']);
-        if (isset($products_catalog[$p_id])) {
-            $total_spent += $products_catalog[$p_id]['price'];
         }
     }
     $stmt->close();
 
-    // 2. Fetch Recent Orders for the view table layout preview
-    // Fixed: Ordering and selecting by order_id
-    $table_query = "SELECT order_id, product_id, status FROM orders WHERE user_id = ? ORDER BY order_id DESC LIMIT 5";
+    // Fetch Recent Orders with product details
+    $table_query = "SELECT o.oid, o.status, of.fid, of.oqty, f.fname, f.fprice 
+                    FROM orders o
+                    JOIN orderfurnitures of ON o.oid = of.oid
+                    JOIN furnitures f ON of.fid = f.fid
+                    WHERE o.cid = ? 
+                    ORDER BY o.oid DESC 
+                    LIMIT 5";
     $stmt = $conn->prepare($table_query);
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $recent_orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    // Calculate total spent
+    $spent_query = "SELECT SUM(of.oqty * f.fprice) as total_spent 
+                    FROM orders o
+                    JOIN orderfurnitures of ON o.oid = of.oid
+                    JOIN furnitures f ON of.fid = f.fid
+                    WHERE o.cid = ?";
+    $stmt = $conn->prepare($spent_query);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $spent_result = $stmt->get_result()->fetch_assoc();
+    $total_spent = $spent_result['total_spent'] ?? 0;
     $stmt->close();
 
     $conn->close();
@@ -77,19 +88,6 @@ if (!$conn->connect_error) {
     <title>Customer Dashboard - Premium Living</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
-    <style>
-        /* Forces standard centralized grid alignment from your requested specs */
-        table th, table td {
-            text-align: center !important;
-            vertical-align: middle;
-            padding: 1.2rem 1.5rem;
-        }
-        .badge-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-    </style>
 </head>
 <body>
 
@@ -142,40 +140,38 @@ if (!$conn->connect_error) {
             <table>
                 <thead>
                 <tr>
-                    <th style="width: 15%;">Order ID</th>
-                    <th style="width: 25%;">Product Name</th>
-                    <th style="width: 20%;">Total</th>
-                    <th style="width: 20%;">Status</th>
-                    <th style="width: 20%;">Action</th>
+                    <th>Order ID</th>
+                    <th>Product Name</th>
+                    <th>Quantity</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($recent_orders)): ?>
                     <tr>
-                        <td colspan="5" style="text-align: center; color: var(--gray-wood); padding: 3rem;">
+                        <td colspan="6" style="text-align: center; color: #a89f91; padding: 3rem;">
                             <i class="fas fa-folder-open" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
                             No recent orders found. Get started on making an item order!
                         </td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($recent_orders as $order):
-                        $p_id = intval($order['product_id']);
-                        $product_name = isset($products_catalog[$p_id]) ? $products_catalog[$p_id]['name'] : "Handcrafted Furniture Pieces";
-                        $product_cost = isset($products_catalog[$p_id]) ? "$" . number_format($products_catalog[$p_id]['price']) : "N/A";
+                        $total = $order['oqty'] * $order['fprice'];
                         ?>
                         <tr>
-                            <td><strong>#<?php echo $order['order_id']; ?></strong></td>
-                            <td><?php echo htmlspecialchars($product_name); ?></td>
-                            <td><span style="color: var(--wood-dark); font-weight: 600;"><?php echo $product_cost; ?></span></td>
+                            <td><strong>#<?php echo $order['oid']; ?></strong></td>
+                            <td><?php echo htmlspecialchars($order['fname']); ?></td>
+                            <td><?php echo $order['oqty']; ?></td>
+                            <td><span style="color: var(--wood-dark); font-weight: 600;">$<?php echo number_format($total, 2); ?></span></td>
                             <td>
-                                <div class="badge-container">
-                                        <span class="badge-success <?php echo ($order['status'] === 'Pending') ? 'badge-warning' : 'badge-completed'; ?>">
-                                            <?php echo htmlspecialchars($order['status']); ?>
-                                        </span>
-                                </div>
+                                <span class="badge-success <?php echo ($order['status'] === 'Pending' || $order['status'] === 'Open') ? 'badge-warning' : 'badge-completed'; ?>">
+                                    <?php echo htmlspecialchars($order['status']); ?>
+                                </span>
                             </td>
                             <td>
-                                <a href="view-orders.php" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.8rem; text-decoration: none;">
+                                <a href="view-order-details.php?oid=<?php echo $order['oid']; ?>" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.8rem; text-decoration: none;">
                                     <i class="fas fa-eye"></i> View
                                 </a>
                             </td>

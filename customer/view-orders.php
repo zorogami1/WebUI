@@ -18,23 +18,19 @@ $conn = new mysqli($servername, $db_username, $db_password, $dbname);
 $orders = [];
 
 if (!$conn->connect_error) {
-    $stmt = $conn->prepare("SELECT order_id, product_id, status FROM orders WHERE user_id = ? ORDER BY order_id DESC");
+    // Fetch orders with product details
+    $stmt = $conn->prepare("SELECT o.oid, o.status, o.odate, of.fid, of.oqty, f.fname, f.fprice 
+                            FROM orders o
+                            JOIN orderfurnitures of ON o.oid = of.oid
+                            JOIN furnitures f ON of.fid = f.fid
+                            WHERE o.cid = ? 
+                            ORDER BY o.oid DESC");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     $conn->close();
 }
-
-// Product Catalog Mapping Array
-$products_catalog = [
-        1 => "Oak Dining Chair",
-        2 => "Large Dining Table",
-        3 => "3-Seater Fabric Sofa",
-        4 => "Wooden Wardrobe",
-        5 => "Industrial Bookshelf",
-        6 => "Queen Size Bed Frame"
-];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -44,21 +40,6 @@ $products_catalog = [
     <title>Your Orders - Premium Living</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
-    <style>
-        /* Forces absolute center alignment across all table elements */
-        table th, table td {
-            text-align: center !important;
-            vertical-align: middle;
-            padding: 1.2rem 1.5rem;
-        }
-
-        /* Center-align the status badge container wrapper */
-        .badge-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-    </style>
 </head>
 <body>
 
@@ -90,30 +71,41 @@ $products_catalog = [
             <table>
                 <thead>
                 <tr>
-                    <th style="width: 25%;">Order ID</th>
-                    <th style="width: 50%;">Product Name</th>
-                    <th style="width: 25%;">Status</th>
+                    <th>Order ID</th>
+                    <th>Date</th>
+                    <th>Product</th>
+                    <th>Quantity</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                    <th>Status</th>
+                    <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($orders)): ?>
                     <tr>
-                        <td colspan="3" style="text-align: center; color: var(--gray-wood); padding: 2rem;">No orders found.</td>
+                        <td colspan="8" style="text-align: center; color: #a89f91; padding: 2rem;">No orders found.</td>
                     </tr>
                 <?php else: ?>
                     <?php foreach ($orders as $order):
-                        $p_id = intval($order['product_id']);
-                        $product_name = isset($products_catalog[$p_id]) ? $products_catalog[$p_id] : "Premium Piece (Item ID: " . $p_id . ")";
+                        $total = $order['oqty'] * $order['fprice'];
                         ?>
                         <tr>
-                            <td><strong>#<?php echo $order['order_id']; ?></strong></td>
-                            <td><?php echo htmlspecialchars($product_name); ?></td>
+                            <td><strong>#<?php echo $order['oid']; ?></strong></td>
+                            <td><?php echo date('Y-m-d', strtotime($order['odate'])); ?></td>
+                            <td><?php echo htmlspecialchars($order['fname']); ?></td>
+                            <td><?php echo $order['oqty']; ?></td>
+                            <td>$<?php echo number_format($order['fprice'], 2); ?></td>
+                            <td><strong>$<?php echo number_format($total, 2); ?></strong></td>
                             <td>
-                                <div class="badge-container">
-                                        <span class="badge-success <?php echo ($order['status'] === 'Pending') ? 'badge-warning' : 'badge-completed'; ?>">
-                                            <?php echo htmlspecialchars($order['status']); ?>
-                                        </span>
-                                </div>
+                                <span class="badge-success <?php echo ($order['status'] === 'Pending' || $order['status'] === 'Open') ? 'badge-warning' : 'badge-completed'; ?>">
+                                    <?php echo htmlspecialchars($order['status']); ?>
+                                </span>
+                            </td>
+                            <td>
+                                <a href="view-order-details.php?oid=<?php echo $order['oid']; ?>" class="btn btn-primary" style="padding: 0.3rem 0.8rem; font-size: 0.8rem; text-decoration: none;">
+                                    <i class="fas fa-eye"></i>
+                                </a>
                             </td>
                         </tr>
                     <?php endforeach; ?>

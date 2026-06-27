@@ -19,43 +19,58 @@ $dbname = "createprojectdb";
 
 $conn = new mysqli($servername, $db_username, $db_password, $dbname);
 
-// 1. Process Order Cancellation
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['order_id'])) {
-    $order_id = intval($_POST['order_id']);
+// Process Order Cancellation
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['oid'])) {
+    $order_id = intval($_POST['oid']);
 
-    $stmt = $conn->prepare("DELETE FROM orders WHERE order_id = ? AND user_id = ?");
-    $stmt->bind_param("ii", $order_id, $user_id);
+    // Check if order can be deleted (only if status is Open or Pending)
+    $check_stmt = $conn->prepare("SELECT status FROM orders WHERE oid = ? AND cid = ?");
+    $check_stmt->bind_param("ii", $order_id, $user_id);
+    $check_stmt->execute();
+    $result = $check_stmt->get_result();
+    $order = $result->fetch_assoc();
+    $check_stmt->close();
 
-    if ($stmt->execute() && $stmt->affected_rows > 0) {
-        $message = "Order #$order_id was successfully cancelled and removed.";
-        $message_type = "alert-success";
+    if ($order && ($order['status'] === 'Open' || $order['status'] === 'Pending')) {
+        // First delete from orderfurnitures
+        $stmt1 = $conn->prepare("DELETE FROM orderfurnitures WHERE oid = ?");
+        $stmt1->bind_param("i", $order_id);
+        $stmt1->execute();
+        $stmt1->close();
+
+        // Then delete from orders
+        $stmt2 = $conn->prepare("DELETE FROM orders WHERE oid = ? AND cid = ?");
+        $stmt2->bind_param("ii", $order_id, $user_id);
+
+        if ($stmt2->execute() && $stmt2->affected_rows > 0) {
+            $message = "Order #$order_id was successfully cancelled and removed.";
+            $message_type = "alert-success";
+        } else {
+            $message = "Could not delete order. It may have already been processed or removed.";
+            $message_type = "alert-warning";
+        }
+        $stmt2->close();
     } else {
-        $message = "Could not delete order. It may have already been processed or removed.";
+        $message = "This order cannot be cancelled because it has already been processed.";
         $message_type = "alert-warning";
     }
-    $stmt->close();
 }
 
-// 2. Fetch Active Orders
+// Fetch Active Orders
 $orders = [];
 if (!$conn->connect_error) {
-    $stmt = $conn->prepare("SELECT order_id, product_id FROM orders WHERE user_id = ? ORDER BY order_id DESC");
+    $stmt = $conn->prepare("SELECT o.oid, of.fid, f.fname 
+                            FROM orders o
+                            JOIN orderfurnitures of ON o.oid = of.oid
+                            JOIN furnitures f ON of.fid = f.fid
+                            WHERE o.cid = ? AND (o.status = 'Open' OR o.status = 'Pending')
+                            ORDER BY o.oid DESC");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
     $orders = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     $stmt->close();
     $conn->close();
 }
-
-// 3. Product Catalog Mapping Array
-$products_catalog = [
-        1 => "Oak Dining Chair",
-        2 => "Large Dining Table",
-        3 => "3-Seater Fabric Sofa",
-        4 => "Wooden Wardrobe",
-        5 => "Industrial Bookshelf",
-        6 => "Queen Size Bed Frame"
-];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -65,20 +80,6 @@ $products_catalog = [
     <title>Cancel Order - Premium Living</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
-    <style>
-        /* Forces absolute center alignment across all table components */
-        table th, table td {
-            text-align: center !important;
-            vertical-align: middle;
-            padding: 1.2rem 1.5rem;
-        }
-
-        /* Ensures action forms align inline for centering */
-        .action-form {
-            display: inline-block;
-            margin: 0;
-        }
-    </style>
 </head>
 <body>
 
@@ -104,6 +105,7 @@ $products_catalog = [
     <div class="card">
         <div class="card-header">
             <h2><i class="fas fa-trash-alt"></i> Cancel Pending Orders</h2>
+            <p style="color: #e74c3c; font-size: 0.9rem;">Only orders with status "Open" or "Pending" can be cancelled.</p>
         </div>
 
         <?php if (!empty($message)): ?>
@@ -116,30 +118,27 @@ $products_catalog = [
             <table>
                 <thead>
                 <tr>
-                    <th style="width: 25%;">Order ID</th>
-                    <th style="width: 50%;">Product Name</th>
-                    <th style="width: 25%;">Action</th>
+                    <th>Order ID</th>
+                    <th>Product Name</th>
+                    <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($orders)): ?>
                     <tr>
-                        <td colspan="3" style="text-align: center; color: var(--gray-wood); padding: 2rem;">
+                        <td colspan="3" style="text-align: center; color: #a89f91; padding: 2rem;">
                             <i class="fas fa-folder-open"></i> No active or pending orders found to cancel.
                         </td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($orders as $order):
-                        $p_id = intval($order['product_id']);
-                        $product_name = isset($products_catalog[$p_id]) ? $products_catalog[$p_id] : "Premium Collection Piece (Item ID: " . $p_id . ")";
-                        ?>
+                    <?php foreach ($orders as $order): ?>
                         <tr>
-                            <td><strong>#<?php echo $order['order_id']; ?></strong></td>
-                            <td><?php echo htmlspecialchars($product_name); ?></td>
+                            <td><strong>#<?php echo $order['oid']; ?></strong></td>
+                            <td><?php echo htmlspecialchars($order['fname']); ?></td>
                             <td>
-                                <form action="" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');" class="action-form">
-                                    <input type="hidden" name="order_id" value="<?php echo $order['order_id']; ?>">
-                                    <button type="submit" class="btn btn-danger" style="padding: 0.5rem 1.4rem; font-size: 0.85rem; margin: 0 auto;">
+                                <form action="" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');">
+                                    <input type="hidden" name="oid" value="<?php echo $order['oid']; ?>">
+                                    <button type="submit" class="btn btn-danger" style="padding: 0.5rem 1.4rem; font-size: 0.85rem;">
                                         <i class="fas fa-times"></i> Cancel
                                     </button>
                                 </form>

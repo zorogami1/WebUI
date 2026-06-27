@@ -1,0 +1,507 @@
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+if (!isset($_SESSION['sid'])) {
+    header("Location: login.php");
+    exit();
+}
+
+require_once '../conn.php';
+
+// Check if PDF export is requested
+if (isset($_GET['export']) && $_GET['export'] === 'pdf') {
+    exportPDF();
+    exit();
+}
+
+// Pull real systemic sales tracking rows straight from transactions tables
+try {
+    $query = "SELECT o.oid, o.odate AS date, f.fname AS item, f.fimage, of.oqty AS qty, (of.oqty * f.fprice) AS total, f.fprice AS unit_price
+              FROM Orders o
+              JOIN OrderFurnitures of ON o.oid = of.oid
+              JOIN Furnitures f ON of.fid = f.fid
+              ORDER BY o.odate DESC";
+    $sales_records = $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $sales_records = [];
+}
+
+function exportPDF() {
+    global $pdo;
+
+    // Fetch data for PDF
+    try {
+        $query = "SELECT o.oid, o.odate AS date, f.fname AS item, f.fimage, of.oqty AS qty, (of.oqty * f.fprice) AS total, f.fprice AS unit_price
+                  FROM Orders o
+                  JOIN OrderFurnitures of ON o.oid = of.oid
+                  JOIN Furnitures f ON of.fid = f.fid
+                  ORDER BY o.odate DESC";
+        $sales_records = $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        die("Error fetching data: " . $e->getMessage());
+    }
+
+    // Calculate totals
+    $total_revenue = 0;
+    $total_items = 0;
+    $total_orders = [];
+    foreach ($sales_records as $record) {
+        $total_revenue += $record['total'];
+        $total_items += $record['qty'];
+        $total_orders[$record['oid']] = true;
+    }
+    $total_orders_count = count($total_orders);
+    $avg_order = $total_orders_count > 0 ? $total_revenue / $total_orders_count : 0;
+
+    // Use FPDF
+    require_once('../fpdf/fpdf.php');
+
+    // Create PDF
+    $pdf = new FPDF('P', 'mm', 'A4');
+    $pdf->AddPage();
+    $pdf->SetAutoPageBreak(true, 25);
+
+    // ============================================
+    // HEADER
+    // ============================================
+    // Decorative top line
+    $pdf->SetDrawColor(212, 163, 115);
+    $pdf->SetLineWidth(1.5);
+    $pdf->Line(15, 15, 195, 15);
+
+    // Company Name
+    $pdf->SetY(22);
+    $pdf->SetFont('Arial', 'B', 20);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell(190, 10, 'Premium Living Furniture', 0, 1, 'C');
+
+    // Tagline
+    $pdf->SetFont('Arial', 'I', 10);
+    $pdf->SetTextColor(139, 94, 60);
+    $pdf->Cell(190, 5, 'Crafting Excellence Since 2004', 0, 1, 'C');
+
+    // Decorative line
+    $pdf->SetDrawColor(139, 94, 60);
+    $pdf->SetLineWidth(0.5);
+    $pdf->Line(60, 39, 150, 39);
+
+    // Report Title
+    $pdf->Ln(5);
+    $pdf->SetFont('Arial', 'B', 16);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell(190, 10, 'Sales Analytics Report', 0, 1, 'C');
+    $pdf->SetFont('Arial', '', 10);
+    $pdf->SetTextColor(100, 100, 100);
+    $pdf->Cell(190, 5, 'Comprehensive Sales Performance Summary', 0, 1, 'C');
+    $pdf->Ln(10);
+
+    // ============================================
+    // EXECUTIVE SUMMARY - 4 CARDS
+    // ============================================
+    $pdf->SetFont('Arial', 'B', 13);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell(190, 8, 'Executive Summary', 0, 1, 'L');
+    $pdf->Ln(3);
+
+    // Card dimensions
+    $card_width = 85;
+    $card_height = 28;
+    $spacing = 10;
+    $start_x = 15;
+    $start_y = $pdf->GetY();
+
+    // ROW 1: Total Revenue and Total Orders
+    // Card 1 - Total Revenue
+    $x1 = $start_x;
+    $y1 = $start_y;
+    $pdf->SetFillColor(245, 239, 230);
+    $pdf->SetDrawColor(212, 163, 115);
+    $pdf->SetLineWidth(0.3);
+    $pdf->Rect($x1, $y1, $card_width, $card_height, 'DF');
+
+    $pdf->SetXY($x1, $y1 + 4);
+    $pdf->SetFont('Arial', 'B', 9);
+    $pdf->SetTextColor(139, 94, 60);
+    $pdf->Cell($card_width, 6, 'TOTAL REVENUE', 0, 1, 'C');
+
+    $pdf->SetXY($x1, $y1 + 13);
+    $pdf->SetFont('Arial', 'B', 16);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell($card_width, 10, '$' . number_format($total_revenue, 2), 0, 1, 'C');
+
+    // Card 2 - Total Orders
+    $x2 = $start_x + $card_width + $spacing;
+    $y2 = $start_y;
+    $pdf->SetFillColor(245, 239, 230);
+    $pdf->SetDrawColor(212, 163, 115);
+    $pdf->SetLineWidth(0.3);
+    $pdf->Rect($x2, $y2, $card_width, $card_height, 'DF');
+
+    $pdf->SetXY($x2, $y2 + 4);
+    $pdf->SetFont('Arial', 'B', 9);
+    $pdf->SetTextColor(139, 94, 60);
+    $pdf->Cell($card_width, 6, 'TOTAL ORDERS', 0, 1, 'C');
+
+    $pdf->SetXY($x2, $y2 + 13);
+    $pdf->SetFont('Arial', 'B', 16);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell($card_width, 10, $total_orders_count, 0, 1, 'C');
+
+    // ROW 2: Items Sold and Avg Order Value
+    $start_y2 = $start_y + $card_height + 8;
+
+    // Card 3 - Items Sold
+    $x3 = $start_x;
+    $y3 = $start_y2;
+    $pdf->SetFillColor(245, 239, 230);
+    $pdf->SetDrawColor(212, 163, 115);
+    $pdf->SetLineWidth(0.3);
+    $pdf->Rect($x3, $y3, $card_width, $card_height, 'DF');
+
+    $pdf->SetXY($x3, $y3 + 4);
+    $pdf->SetFont('Arial', 'B', 9);
+    $pdf->SetTextColor(139, 94, 60);
+    $pdf->Cell($card_width, 6, 'ITEMS SOLD', 0, 1, 'C');
+
+    $pdf->SetXY($x3, $y3 + 13);
+    $pdf->SetFont('Arial', 'B', 16);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell($card_width, 10, $total_items, 0, 1, 'C');
+
+    // Card 4 - Avg Order Value
+    $x4 = $start_x + $card_width + $spacing;
+    $y4 = $start_y2;
+    $pdf->SetFillColor(245, 239, 230);
+    $pdf->SetDrawColor(212, 163, 115);
+    $pdf->SetLineWidth(0.3);
+    $pdf->Rect($x4, $y4, $card_width, $card_height, 'DF');
+
+    $pdf->SetXY($x4, $y4 + 4);
+    $pdf->SetFont('Arial', 'B', 9);
+    $pdf->SetTextColor(139, 94, 60);
+    $pdf->Cell($card_width, 6, 'AVG. ORDER VALUE', 0, 1, 'C');
+
+    $pdf->SetXY($x4, $y4 + 13);
+    $pdf->SetFont('Arial', 'B', 16);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell($card_width, 10, '$' . number_format($avg_order, 2), 0, 1, 'C');
+
+    // Move Y position after the cards
+    $pdf->SetY($start_y2 + $card_height + 10);
+
+    // ============================================
+    // TRANSACTION DETAILS TABLE
+    // ============================================
+    $pdf->SetFont('Arial', 'B', 13);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell(190, 8, 'Transaction Details', 0, 1, 'L');
+    $pdf->Ln(2);
+
+    // Table Header
+    $pdf->SetFont('Arial', 'B', 9);
+    $pdf->SetFillColor(62, 42, 33);
+    $pdf->SetTextColor(255, 255, 255);
+    $pdf->SetDrawColor(62, 42, 33);
+    $pdf->SetLineWidth(0.3);
+
+    $pdf->Cell(22, 9, 'Order ID', 1, 0, 'C', true);
+    $pdf->Cell(27, 9, 'Date', 1, 0, 'C', true);
+    $pdf->Cell(58, 9, 'Item', 1, 0, 'C', true);
+    $pdf->Cell(18, 9, 'Qty', 1, 0, 'C', true);
+    $pdf->Cell(30, 9, 'Unit Price', 1, 0, 'C', true);
+    $pdf->Cell(35, 9, 'Total', 1, 1, 'C', true);
+
+    $pdf->SetFont('Arial', '', 8);
+    $pdf->SetTextColor(0, 0, 0);
+
+    // Table Rows
+    if (empty($sales_records)) {
+        $pdf->Cell(190, 8, 'No sales records found.', 1, 1, 'C');
+    } else {
+        $fill = false;
+        foreach ($sales_records as $record) {
+            $fill = !$fill;
+            $pdf->SetFillColor($fill ? 250 : 255, $fill ? 247 : 255, $fill ? 242 : 255);
+
+            $pdf->Cell(22, 7, '#' . $record['oid'], 1, 0, 'C', $fill);
+            $pdf->Cell(27, 7, date('Y-m-d', strtotime($record['date'])), 1, 0, 'C', $fill);
+            $pdf->Cell(58, 7, htmlspecialchars(substr($record['item'], 0, 28)), 1, 0, 'L', $fill);
+            $pdf->Cell(18, 7, $record['qty'], 1, 0, 'C', $fill);
+            $pdf->Cell(30, 7, '$' . number_format($record['unit_price'], 2), 1, 0, 'R', $fill);
+            $pdf->Cell(35, 7, '$' . number_format($record['total'], 2), 1, 1, 'R', $fill);
+        }
+    }
+
+    // Grand Total
+    $pdf->SetFont('Arial', 'B', 10);
+    $pdf->SetFillColor(212, 163, 115);
+    $pdf->SetTextColor(255, 255, 255);
+    $pdf->Cell(155, 9, 'GRAND TOTAL', 1, 0, 'R', true);
+    $pdf->Cell(35, 9, '$' . number_format($total_revenue, 2), 1, 1, 'R', true);
+
+    $pdf->SetTextColor(0, 0, 0);
+    $pdf->Ln(5);
+
+    // ============================================
+    // TOP PERFORMING ITEMS
+    // ============================================
+    $pdf->SetFont('Arial', 'B', 13);
+    $pdf->SetTextColor(62, 42, 33);
+    $pdf->Cell(190, 8, 'Top Performing Items', 0, 1, 'L');
+    $pdf->Ln(2);
+
+    // Calculate sales by item
+    $item_sales = [];
+    foreach ($sales_records as $record) {
+        $item_name = $record['item'];
+        if (!isset($item_sales[$item_name])) {
+            $item_sales[$item_name] = 0;
+        }
+        $item_sales[$item_name] += $record['total'];
+    }
+
+    // Sort and get top 5
+    arsort($item_sales);
+    $top_items = array_slice($item_sales, 0, 5);
+
+    if (!empty($top_items)) {
+        $pdf->SetFont('Arial', '', 10);
+        $rank = 1;
+        foreach ($top_items as $item => $amount) {
+            $pdf->SetTextColor(62, 42, 33);
+            $pdf->Cell(15, 7, '#' . $rank, 0, 0, 'L');
+            $pdf->Cell(130, 7, htmlspecialchars(substr($item, 0, 40)), 0, 0, 'L');
+            $pdf->SetTextColor(139, 94, 60);
+            $pdf->SetFont('Arial', 'B', 10);
+            $pdf->Cell(45, 7, '$' . number_format($amount, 2), 0, 1, 'R');
+            $pdf->SetFont('Arial', '', 10);
+            $rank++;
+        }
+    }
+
+    // ============================================
+    // FOOTER
+    // ============================================
+    $pdf->Ln(5);
+    $pdf->SetFont('Arial', 'I', 8);
+    $pdf->SetTextColor(168, 159, 145);
+    $pdf->Cell(190, 5, 'This report includes all transactions recorded in the system up to ' . date('Y-m-d'), 0, 1, 'C');
+    $pdf->Cell(190, 5, 'For any questions regarding this report, please contact the management team.', 0, 1, 'C');
+
+    // Output PDF
+    $pdf->Output('D', 'Sales_Report_' . date('Y-m-d') . '.pdf');
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Report - Premium Living</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .btn-pdf {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.7rem 1.6rem;
+            border-radius: 2rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-pdf:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
+            color: white;
+        }
+        .btn-pdf i { font-size: 1.1rem; }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="logo"><h1><a href="dashboard.php"><i class="fas fa-tree"></i> Staff Portal</a></h1></div>
+    <ul class="nav-links">
+        <li><a href="dashboard.php">Dashboard</a></li>
+        <li><a href="insert-furniture.php">Insert Furniture</a></li>
+        <li><a href="insert-material.php">Insert Material</a></li>
+        <li><a href="manage-orders.php">Manage Orders</a></li>
+        <li><a href="generate-report.php" class="active">Generate Report</a></li>
+        <li><a href="delete-furniture.php">Delete Furniture</a></li>
+        <li><a href="login.php">Logout</a></li>
+    </ul>
+</nav>
+
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-line"></i> Sales Analytics</h2>
+            <div class="filter-bar">
+                <select id="rangeSelect" class="filter-select">
+                    <option value="7">Last 7 Days</option>
+                    <option value="30" selected>Last 30 Days</option>
+                    <option value="90">Last 3 Months</option>
+                    <option value="365">Last Year</option>
+                    <option value="all">All Time</option>
+                </select>
+                <button class="btn btn-primary" onclick="refreshReport()"><i class="fas fa-sync"></i> Generate</button>
+                <a href="?export=pdf" class="btn-pdf">
+                    <i class="fas fa-file-pdf"></i> Export PDF
+                </a>
+                <button class="btn btn-success" onclick="exportCSV()"><i class="fas fa-file-csv"></i> CSV</button>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalSales">$0</div>
+                <div class="stat-label"><i class="fas fa-dollar-sign"></i> Total Revenue</div>
+            </div>
+            <div class="stat-card" style="border-left-color: #2a9d8f;">
+                <div class="stat-number" id="orderCount">0</div>
+                <div class="stat-label"><i class="fas fa-shopping-cart"></i> Total Orders</div>
+            </div>
+            <div class="stat-card" style="border-left-color: #e76f51;">
+                <div class="stat-number" id="itemsCount">0</div>
+                <div class="stat-label"><i class="fas fa-box"></i> Items Sold</div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="revenueChart" height="250"></canvas>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h2><i class="fas fa-receipt"></i> Transaction Details</h2></div>
+            <div class="table-container">
+                <table id="reportTable">
+                    <thead><tr><th>Order ID</th><th>Date</th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+                    <tbody id="reportBody"></tbody>
+                    <tfoot>
+                    <tr style="background:#f5efe6;">
+                        <td colspan="5" style="text-align:right;"><strong>Grand Total:</strong></td>
+                        <td id="grandTotal">$0</td>
+                    </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const salesData = <?php echo json_encode($sales_records); ?>;
+    let chart;
+
+    function refreshReport() {
+        const days = document.getElementById('rangeSelect').value;
+        let filtered = salesData;
+
+        if (days !== 'all') {
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - parseInt(days));
+            filtered = salesData.filter(d => new Date(d.date) >= cutoff);
+        }
+
+        const total = filtered.reduce((s, i) => s + parseFloat(i.total), 0);
+        const orders = new Set(filtered.map(i => i.oid)).size;
+        const items = filtered.reduce((s, i) => s + parseInt(i.qty), 0);
+
+        document.getElementById('totalSales').innerHTML = `$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+        document.getElementById('orderCount').innerHTML = orders;
+        document.getElementById('itemsCount').innerHTML = items;
+        document.getElementById('grandTotal').innerHTML = `$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
+
+        const tbody = document.getElementById('reportBody');
+        tbody.innerHTML = '';
+
+        filtered.forEach(i => {
+            const r = tbody.insertRow();
+            r.insertCell(0).innerHTML = '#' + i.oid;
+            r.insertCell(1).innerText = i.date.substring(0, 10);
+            r.insertCell(2).innerText = i.item;
+            r.insertCell(3).innerText = i.qty;
+            r.insertCell(4).innerHTML = `$${parseFloat(i.unit_price).toFixed(2)}`;
+            r.insertCell(5).innerHTML = `<strong>$${parseFloat(i.total).toFixed(2)}</strong>`;
+        });
+
+        const daily = {};
+        filtered.forEach(i => {
+            const d = i.date.substring(0, 10);
+            daily[d] = (daily[d] || 0) + parseFloat(i.total);
+        });
+
+        const labels = Object.keys(daily).sort();
+        const values = labels.map(l => daily[l]);
+
+        if(chart) chart.destroy();
+        const ctx = document.getElementById('revenueChart').getContext('2d');
+        chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Daily Sales ($)',
+                    data: values,
+                    borderColor: '#8b5e3c',
+                    backgroundColor: 'rgba(139,94,60,0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: '#d4a373',
+                    pointBorderColor: '#5c3d2e',
+                    pointBorderWidth: 2,
+                    pointRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            font: { size: 12, weight: 'bold' },
+                            color: '#3e2a21'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function exportCSV() {
+        let csv = [["Order ID","Date","Item","Qty","Unit Price","Total"]];
+        document.querySelectorAll('#reportBody tr').forEach(r => {
+            const cells = r.cells;
+            csv.push([
+                cells[0].innerText,
+                cells[1].innerText,
+                cells[2].innerText,
+                cells[3].innerText,
+                cells[4].innerText.replace('$',''),
+                cells[5].innerText.replace('$','')
+            ]);
+        });
+        const blob = new Blob([csv.map(r => r.join(',')).join('\n')], {type:'text/csv'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `report_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+    }
+
+    // Auto-refresh on load
+    refreshReport();
+</script>
+<footer><p>&copy; 2026 Premium Living | Data-Driven Craftsmanship</p></footer>
+</body>
+</html>
