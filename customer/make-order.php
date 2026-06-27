@@ -19,7 +19,7 @@ $message_type = "";
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'] ?? 'Valued Customer';
 
-// ===== FIXED: Properly include conn.php and check if $pdo exists =====
+// ===== USE conn.php =====
 require_once '../conn.php';
 
 // Check if $pdo is defined
@@ -38,34 +38,70 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
         $product = $price_stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($product) {
-            $total_amount = $product['fprice'] * $oqty;
-            $delivery_date = date('Y-m-d', strtotime('+7 days'));
+            // ===== CHECK MATERIAL STOCK AVAILABILITY =====
+            $stock_stmt = $pdo->prepare("
+                SELECT fm.mid, fm.pmqty, m.mqty as available_stock,
+                       FLOOR(m.mqty / fm.pmqty) as max_units
+                FROM furniturematerials fm
+                JOIN materials m ON fm.mid = m.mid
+                WHERE fm.fid = ?
+            ");
+            $stock_stmt->execute([$fid]);
+            $materials_needed = $stock_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Get customer's delivery address
-            $addr_stmt = $pdo->prepare("SELECT caddr FROM customers WHERE cid = ?");
-            $addr_stmt->execute([$user_id]);
-            $customer = $addr_stmt->fetch(PDO::FETCH_ASSOC);
-            $delivery_address = $customer['caddr'] ?? 'Please update your address';
+            // Check if all materials have enough stock
+            $can_fulfill = true;
+            $stock_warning = "";
+            foreach ($materials_needed as $mat) {
+                $needed = $mat['pmqty'] * $oqty;
+                if ($needed > $mat['available_stock']) {
+                    $can_fulfill = false;
+                    $max_available = floor($mat['available_stock'] / $mat['pmqty']);
+                    $stock_warning = "Not enough material stock. Only $max_available units available.";
+                    break;
+                }
+            }
 
-            // Start transaction
-            $pdo->beginTransaction();
+            if ($can_fulfill) {
+                $total_amount = $product['fprice'] * $oqty;
+                $delivery_date = date('Y-m-d', strtotime('+7 days'));
 
-            // Insert into orders
-            $stmt = $pdo->prepare("INSERT INTO orders (cid, ototalamount, odeliverydate, odeliveraddress, status) VALUES (?, ?, ?, ?, 'Pending')");
-            $stmt->execute([$user_id, $total_amount, $delivery_date, $delivery_address]);
-            $oid = $pdo->lastInsertId();
+                // Get customer's delivery address
+                $addr_stmt = $pdo->prepare("SELECT caddr FROM customers WHERE cid = ?");
+                $addr_stmt->execute([$user_id]);
+                $customer = $addr_stmt->fetch(PDO::FETCH_ASSOC);
+                $delivery_address = $customer['caddr'] ?? 'Please update your address';
 
-            // Insert into orderfurnitures
-            $stmt2 = $pdo->prepare("INSERT INTO orderfurnitures (oid, fid, oqty) VALUES (?, ?, ?)");
-            $stmt2->execute([$oid, $fid, $oqty]);
+                // Start transaction
+                $pdo->beginTransaction();
 
-            $pdo->commit();
+                // Insert into orders
+                $stmt = $pdo->prepare("INSERT INTO orders (cid, ototalamount, odeliverydate, odeliveraddress, status) VALUES (?, ?, ?, ?, 'Pending')");
+                $stmt->execute([$user_id, $total_amount, $delivery_date, $delivery_address]);
+                $oid = $pdo->lastInsertId();
 
-            $message = "Order placed successfully! Order #$oid has been created.";
-            $message_type = "alert-success";
+                // Insert into orderfurnitures
+                $stmt2 = $pdo->prepare("INSERT INTO orderfurnitures (oid, fid, oqty) VALUES (?, ?, ?)");
+                $stmt2->execute([$oid, $fid, $oqty]);
 
-            // Redirect after 2 seconds
-            echo "<script>setTimeout(() => { window.location.href = 'view-orders.php'; }, 2000);</script>";
+                // ===== DECREASE MATERIAL STOCK =====
+                foreach ($materials_needed as $mat) {
+                    $total_needed = $mat['pmqty'] * $oqty;
+                    $update_stmt = $pdo->prepare("UPDATE materials SET mqty = mqty - ? WHERE mid = ?");
+                    $update_stmt->execute([$total_needed, $mat['mid']]);
+                }
+
+                $pdo->commit();
+
+                $message = "Order placed successfully! Order #$oid has been created.";
+                $message_type = "alert-success";
+
+                // Redirect after 2 seconds
+                echo "<script>setTimeout(() => { window.location.href = 'view-orders.php'; }, 2000);</script>";
+            } else {
+                $message = $stock_warning;
+                $message_type = "alert-warning";
+            }
         } else {
             $message = "Product not found.";
             $message_type = "alert-warning";
@@ -102,6 +138,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             --radius-card: 1.25rem;
             --radius-btn: 2rem;
             --input-border: #d4c4a8;
+            --stock-available: #2d6a4f;
+            --stock-low: #b06000;
+            --stock-out: #cc0000;
         }
 
         * {
@@ -124,7 +163,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             padding: 0 1.5rem;
         }
 
-        /* ===== NAVBAR ===== */
         .navbar {
             background: var(--wood-dark);
             padding: 0.8rem 2rem;
@@ -185,7 +223,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             color: var(--accent-gold);
         }
 
-        /* ===== CARD ===== */
         .card {
             background: white;
             border-radius: var(--radius-card);
@@ -218,7 +255,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             margin-top: 0.3rem;
         }
 
-        /* ===== PRODUCT GRID ===== */
         .product-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -243,7 +279,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             box-shadow: var(--shadow-warm);
         }
 
-        /* ===== FIXED IMAGE HEIGHT ===== */
         .product-image {
             background: linear-gradient(145deg, #e8dccc, #d4c4a8);
             display: flex;
@@ -282,7 +317,35 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             opacity: 0.5;
         }
 
-        /* ===== FLEXIBLE PRODUCT INFO LAYOUT ===== */
+        /* ===== STOCK BADGE ===== */
+        .stock-badge {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.3rem 0.8rem;
+            border-radius: 2rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .stock-available {
+            background: var(--stock-available);
+            color: white;
+        }
+
+        .stock-low {
+            background: var(--stock-low);
+            color: white;
+        }
+
+        .stock-out {
+            background: var(--stock-out);
+            color: white;
+        }
+
         .product-info {
             padding: 1.5rem;
             display: flex;
@@ -314,7 +377,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             line-height: 1.5;
         }
 
-        /* ===== FIXED META AND BUTTON AREA ===== */
         .product-footer {
             margin-top: auto;
             border-top: 1px solid rgba(139,94,60,0.1);
@@ -329,6 +391,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             font-size: 0.8rem;
             color: var(--gray-wood);
             margin-bottom: 0.8rem;
+            flex-wrap: wrap;
+            gap: 0.3rem;
         }
 
         .product-meta i {
@@ -336,7 +400,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             margin-right: 0.3rem;
         }
 
-        /* ===== FIXED ORDER FORM ===== */
+        .product-meta .stock-info {
+            font-weight: 600;
+        }
+
+        .product-meta .stock-info.available {
+            color: var(--stock-available);
+        }
+
+        .product-meta .stock-info.low {
+            color: var(--stock-low);
+        }
+
+        .product-meta .stock-info.out {
+            color: var(--stock-out);
+        }
+
         .order-form {
             display: flex;
             gap: 0.5rem;
@@ -427,7 +506,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             box-shadow: 0 4px 15px rgba(212, 163, 115, 0.4);
         }
 
-        /* ===== ALERTS ===== */
+        .btn-secondary {
+            background: var(--gray-wood);
+            color: white;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-secondary:hover {
+            background: var(--gray-wood);
+            transform: none;
+            box-shadow: none;
+        }
+
         .alert {
             padding: 0.8rem 1rem;
             border-radius: 0.8rem;
@@ -455,7 +546,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             border: 1px solid #e9b35f;
         }
 
-        /* ===== FOOTER ===== */
+        .sort-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            padding: 0 2rem 1rem 2rem;
+            flex-wrap: wrap;
+        }
+
+        .sort-controls label {
+            font-weight: 600;
+            color: var(--wood-dark);
+            font-size: 0.85rem;
+        }
+
+        .sort-controls select {
+            padding: 0.4rem 0.8rem;
+            border: 1.5px solid var(--input-border);
+            border-radius: 0.5rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            background: white;
+            color: var(--wood-dark);
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .sort-controls select:focus {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.15);
+        }
+
         footer {
             background: var(--wood-dark);
             color: rgba(255,255,255,0.7);
@@ -470,7 +591,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             margin-right: 0.5rem;
         }
 
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 768px) {
             .navbar {
                 flex-direction: column;
@@ -532,6 +652,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                 height: 32px;
                 font-size: 0.8rem;
             }
+
+            .product-meta {
+                flex-direction: column;
+                gap: 0.3rem;
+                align-items: flex-start;
+            }
+
+            .sort-controls {
+                padding: 0 1rem 1rem 1rem;
+            }
         }
 
         @media (max-width: 480px) {
@@ -582,21 +712,48 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             </div>
         <?php endif; ?>
 
-        <div class="product-grid">
+        <div class="sort-controls">
+            <label for="sortProducts"><i class="fas fa-sort"></i> Sort by:</label>
+            <select id="sortProducts" onchange="sortProducts()">
+                <option value="name_asc">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="price_asc">Price (Low to High)</option>
+                <option value="price_desc">Price (High to Low)</option>
+                <option value="stock_desc">Availability (In Stock)</option>
+            </select>
+        </div>
+
+        <div class="product-grid" id="productGrid">
             <?php
             try {
-                // Check if $pdo exists before using it
                 if (!isset($pdo)) {
                     throw new Exception("Database connection not available");
                 }
 
-                $products = $pdo->query("SELECT fid, fname, fdesc, fprice, fimage FROM furnitures ORDER BY fid ASC");
+                // Get products with stock information
+                $products = $pdo->query("
+                    SELECT DISTINCT 
+                        f.fid, 
+                        f.fname, 
+                        f.fdesc, 
+                        f.fprice, 
+                        f.fimage,
+                        (
+                            SELECT FLOOR(MIN(m.mqty / fm.pmqty))
+                            FROM furniturematerials fm
+                            JOIN materials m ON fm.mid = m.mid
+                            WHERE fm.fid = f.fid
+                        ) as max_available
+                    FROM furnitures f
+                    ORDER BY f.fid ASC
+                ");
 
                 while ($p = $products->fetch(PDO::FETCH_ASSOC)):
                     $image_path = "";
                     $has_image = false;
+                    $available_stock = floor($p['max_available'] ?? 0);
+                    $in_stock = $available_stock > 0;
 
-                    // Check if fimage exists and file exists
                     if (!empty($p['fimage'])) {
                         $upload_path = "../" . $p['fimage'];
                         if (file_exists($upload_path)) {
@@ -605,7 +762,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                         }
                     }
 
-                    // If no image found, check default images folder
                     if (!$has_image) {
                         $default_paths = [
                                 "../images/" . $p['fid'] . ".png",
@@ -620,8 +776,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                             }
                         }
                     }
+
+                    $stock_status = 'available';
+                    $stock_text = "$available_stock available";
+                    $badge_class = 'stock-available';
+                    $stock_class = 'available';
+
+                    if ($available_stock <= 0) {
+                        $stock_status = 'out';
+                        $stock_text = 'SOLD OUT';
+                        $badge_class = 'stock-out';
+                        $stock_class = 'out';
+                    } elseif ($available_stock <= 3) {
+                        $stock_status = 'low';
+                        $stock_text = "Only $available_stock left!";
+                        $badge_class = 'stock-low';
+                        $stock_class = 'low';
+                    }
                     ?>
-                    <div class="product-card">
+                    <div class="product-card" data-name="<?php echo strtolower($p['fname']); ?>" data-price="<?php echo $p['fprice']; ?>" data-stock="<?php echo $available_stock; ?>">
                         <div class="product-image">
                             <?php if ($has_image): ?>
                                 <img src="<?php echo $image_path; ?>" alt="<?php echo $p['fname']; ?>" loading="lazy">
@@ -630,6 +803,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                                     <i class="fas fa-chair"></i>
                                 </div>
                             <?php endif; ?>
+                            <span class="stock-badge <?php echo $badge_class; ?>">
+                                <?php echo $stock_text; ?>
+                            </span>
                         </div>
                         <div class="product-info">
                             <div class="product-title"><?php echo htmlspecialchars($p['fname']); ?></div>
@@ -638,19 +814,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                             <div class="product-footer">
                                 <div class="product-meta">
                                     <span><i class="fas fa-tag"></i> SKU: #<?php echo $p['fid']; ?></span>
+                                    <span class="stock-info <?php echo $stock_class; ?>">
+                                        <i class="fas <?php echo ($stock_status === 'out') ? 'fa-times-circle' : (($stock_status === 'low') ? 'fa-exclamation-triangle' : 'fa-check-circle'); ?>"></i>
+                                        <?php echo $stock_text; ?>
+                                    </span>
                                 </div>
-                                <form action="" method="POST" class="order-form" onsubmit="return validateQuantity(this)">
-                                    <input type="hidden" name="action" value="place_order">
-                                    <input type="hidden" name="fid" value="<?php echo $p['fid']; ?>">
-                                    <div class="qty-wrapper">
-                                        <button type="button" class="qty-btn" data-action="minus">−</button>
-                                        <input type="number" name="quantity" class="qty-input" value="1" min="1" max="10">
-                                        <button type="button" class="qty-btn" data-action="plus">+</button>
-                                    </div>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-cart-plus"></i> Buy Now
+                                <?php if ($in_stock): ?>
+                                    <form action="" method="POST" class="order-form" onsubmit="return validateQuantity(this)">
+                                        <input type="hidden" name="action" value="place_order">
+                                        <input type="hidden" name="fid" value="<?php echo $p['fid']; ?>">
+                                        <div class="qty-wrapper">
+                                            <button type="button" class="qty-btn" data-action="minus">−</button>
+                                            <input type="number" name="quantity" class="qty-input" value="1" min="1" max="<?php echo min($available_stock, 10); ?>">
+                                            <button type="button" class="qty-btn" data-action="plus">+</button>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-cart-plus"></i> Buy Now
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <button class="btn btn-secondary" disabled style="width: 100%;">
+                                        <i class="fas fa-times-circle"></i> Out of Stock
                                     </button>
-                                </form>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -668,13 +854,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
 </footer>
 
 <script>
-    // ===== FIXED: Quantity button functionality =====
     document.querySelectorAll('.qty-wrapper').forEach(wrapper => {
         const input = wrapper.querySelector('.qty-input');
         const max = parseInt(input.getAttribute('max')) || 10;
         const min = parseInt(input.getAttribute('min')) || 1;
 
-        // Minus button
         const minusBtn = wrapper.querySelector('[data-action="minus"]');
         if (minusBtn) {
             minusBtn.addEventListener('click', function(e) {
@@ -686,7 +870,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             });
         }
 
-        // Plus button
         const plusBtn = wrapper.querySelector('[data-action="plus"]');
         if (plusBtn) {
             plusBtn.addEventListener('click', function(e) {
@@ -698,7 +881,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             });
         }
 
-        // Ensure value stays within bounds when user types
         input.addEventListener('change', function() {
             let value = parseInt(this.value) || min;
             if (value < min) this.value = min;
@@ -706,7 +888,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
         });
     });
 
-    // Validate quantity before form submission
     function validateQuantity(form) {
         const input = form.querySelector('.qty-input');
         const value = parseInt(input.value) || 1;
@@ -718,6 +899,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             return false;
         }
         return true;
+    }
+
+    function sortProducts() {
+        const grid = document.getElementById('productGrid');
+        const cards = Array.from(grid.querySelectorAll('.product-card'));
+        const sortBy = document.getElementById('sortProducts').value;
+
+        cards.sort((a, b) => {
+            const nameA = a.getAttribute('data-name');
+            const nameB = b.getAttribute('data-name');
+            const priceA = parseFloat(a.getAttribute('data-price'));
+            const priceB = parseFloat(b.getAttribute('data-price'));
+            const stockA = parseInt(a.getAttribute('data-stock'));
+            const stockB = parseInt(b.getAttribute('data-stock'));
+
+            switch(sortBy) {
+                case 'name_asc': return nameA.localeCompare(nameB);
+                case 'name_desc': return nameB.localeCompare(nameA);
+                case 'price_asc': return priceA - priceB;
+                case 'price_desc': return priceB - priceA;
+                case 'stock_desc': return stockB - stockA;
+                default: return 0;
+            }
+        });
+
+        cards.forEach(card => grid.appendChild(card));
     }
 </script>
 

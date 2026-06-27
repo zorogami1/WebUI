@@ -22,9 +22,9 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf') {
 // Pull real systemic sales tracking rows straight from transactions tables
 try {
     $query = "SELECT o.oid, o.odate AS date, f.fname AS item, f.fimage, of.oqty AS qty, (of.oqty * f.fprice) AS total, f.fprice AS unit_price
-              FROM Orders o
-              JOIN OrderFurnitures of ON o.oid = of.oid
-              JOIN Furnitures f ON of.fid = f.fid
+              FROM orders o
+              JOIN orderfurnitures of ON o.oid = of.oid
+              JOIN furnitures f ON of.fid = f.fid
               ORDER BY o.odate DESC";
     $sales_records = $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -37,9 +37,9 @@ function exportPDF() {
     // Fetch data for PDF
     try {
         $query = "SELECT o.oid, o.odate AS date, f.fname AS item, f.fimage, of.oqty AS qty, (of.oqty * f.fprice) AS total, f.fprice AS unit_price
-                  FROM Orders o
-                  JOIN OrderFurnitures of ON o.oid = of.oid
-                  JOIN Furnitures f ON of.fid = f.fid
+                  FROM orders o
+                  JOIN orderfurnitures of ON o.oid = of.oid
+                  JOIN furnitures f ON of.fid = f.fid
                   ORDER BY o.odate DESC";
         $sales_records = $pdo->query($query)->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
@@ -61,8 +61,36 @@ function exportPDF() {
     // Use FPDF
     require_once('../fpdf/fpdf.php');
 
+    // Custom PDF class to handle images
+    class PDF extends FPDF {
+        function CellWithImage($w, $h, $image_path, $text, $border=0, $align='C') {
+            // Get the current x position
+            $x = $this->GetX();
+            $y = $this->GetY();
+
+            // Check if image exists
+            if (!empty($image_path) && file_exists('../' . $image_path)) {
+                // Calculate image height
+                $image_height = $h - 2;
+                $image_width = $image_height;
+
+                // Place image
+                $this->Image('../' . $image_path, $x + 1, $y + 1, $image_width, $image_height);
+                // Move cursor after image
+                $this->SetX($x + $image_width + 4);
+                // Output text next to image
+                $this->Cell($w - $image_width - 4, $h, $text, 0, 0, $align);
+            } else {
+                // Output text only
+                $this->Cell($w, $h, $text, 0, 0, $align);
+            }
+            // Reset X position
+            $this->SetX($x + $w);
+        }
+    }
+
     // Create PDF
-    $pdf = new FPDF('P', 'mm', 'A4');
+    $pdf = new PDF('P', 'mm', 'A4');
     $pdf->AddPage();
     $pdf->SetAutoPageBreak(true, 25);
 
@@ -202,7 +230,7 @@ function exportPDF() {
     $pdf->Cell(190, 8, 'Transaction Details', 0, 1, 'L');
     $pdf->Ln(2);
 
-    // Table Header
+    // Table Header - Added Image column
     $pdf->SetFont('Arial', 'B', 9);
     $pdf->SetFillColor(62, 42, 33);
     $pdf->SetTextColor(255, 255, 255);
@@ -211,7 +239,8 @@ function exportPDF() {
 
     $pdf->Cell(22, 9, 'Order ID', 1, 0, 'C', true);
     $pdf->Cell(27, 9, 'Date', 1, 0, 'C', true);
-    $pdf->Cell(58, 9, 'Item', 1, 0, 'C', true);
+    $pdf->Cell(20, 9, 'Image', 1, 0, 'C', true);
+    $pdf->Cell(38, 9, 'Item', 1, 0, 'C', true);
     $pdf->Cell(18, 9, 'Qty', 1, 0, 'C', true);
     $pdf->Cell(30, 9, 'Unit Price', 1, 0, 'C', true);
     $pdf->Cell(35, 9, 'Total', 1, 1, 'C', true);
@@ -228,12 +257,27 @@ function exportPDF() {
             $fill = !$fill;
             $pdf->SetFillColor($fill ? 250 : 255, $fill ? 247 : 255, $fill ? 242 : 255);
 
-            $pdf->Cell(22, 7, '#' . $record['oid'], 1, 0, 'C', $fill);
-            $pdf->Cell(27, 7, date('Y-m-d', strtotime($record['date'])), 1, 0, 'C', $fill);
-            $pdf->Cell(58, 7, htmlspecialchars(substr($record['item'], 0, 28)), 1, 0, 'L', $fill);
-            $pdf->Cell(18, 7, $record['qty'], 1, 0, 'C', $fill);
-            $pdf->Cell(30, 7, '$' . number_format($record['unit_price'], 2), 1, 0, 'R', $fill);
-            $pdf->Cell(35, 7, '$' . number_format($record['total'], 2), 1, 1, 'R', $fill);
+            $pdf->Cell(22, 10, '#' . $record['oid'], 1, 0, 'C', $fill);
+            $pdf->Cell(27, 10, date('Y-m-d', strtotime($record['date'])), 1, 0, 'C', $fill);
+
+            // Image cell
+            $image_cell = 20;
+            $image_x = $pdf->GetX();
+            $image_y = $pdf->GetY();
+
+            if (!empty($record['fimage']) && file_exists('../' . $record['fimage'])) {
+                // Place image in cell
+                $pdf->Image('../' . $record['fimage'], $image_x + 2, $image_y + 1, 16, 8);
+                $pdf->SetX($image_x + $image_cell);
+            } else {
+                // If no image, show placeholder text
+                $pdf->Cell($image_cell, 10, 'N/A', 1, 0, 'C', $fill);
+            }
+
+            $pdf->Cell(38, 10, htmlspecialchars(substr($record['item'], 0, 28)), 1, 0, 'L', $fill);
+            $pdf->Cell(18, 10, $record['qty'], 1, 0, 'C', $fill);
+            $pdf->Cell(30, 10, '$' . number_format($record['unit_price'], 2), 1, 0, 'R', $fill);
+            $pdf->Cell(35, 10, '$' . number_format($record['total'], 2), 1, 1, 'R', $fill);
         }
     }
 
@@ -305,7 +349,6 @@ function exportPDF() {
     <title>Sales Report - Premium Living</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link rel="stylesheet" href="../css/styles.css">
     <style>
         :root {
             --wood-dark: #3e2a21;
@@ -593,6 +636,7 @@ function exportPDF() {
             border-bottom: 1px solid rgba(0,0,0,0.05);
             color: var(--wood-dark);
             font-size: 0.9rem;
+            vertical-align: middle;
         }
 
         .table-container tbody tr:hover {
@@ -603,6 +647,13 @@ function exportPDF() {
             font-weight: 700;
             font-size: 1rem;
             background: var(--cream);
+        }
+
+        .product-thumb {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 6px;
         }
 
         /* ===== FOOTER ===== */
@@ -749,6 +800,7 @@ function exportPDF() {
                 <tr>
                     <th>Order ID</th>
                     <th>Date</th>
+                    <th>Image</th>
                     <th>Item</th>
                     <th>Qty</th>
                     <th>Unit Price</th>
@@ -758,7 +810,7 @@ function exportPDF() {
                 <tbody id="reportBody"></tbody>
                 <tfoot>
                 <tr>
-                    <td colspan="5" style="text-align:right;"><strong>Grand Total:</strong></td>
+                    <td colspan="6" style="text-align:right;"><strong>Grand Total:</strong></td>
                     <td id="grandTotal">$0</td>
                 </tr>
                 </tfoot>
@@ -797,10 +849,24 @@ function exportPDF() {
             const r = tbody.insertRow();
             r.insertCell(0).innerHTML = '#' + i.oid;
             r.insertCell(1).innerText = i.date.substring(0, 10);
-            r.insertCell(2).innerText = i.item;
-            r.insertCell(3).innerText = i.qty;
-            r.insertCell(4).innerHTML = `$${parseFloat(i.unit_price).toFixed(2)}`;
-            r.insertCell(5).innerHTML = `<strong>$${parseFloat(i.total).toFixed(2)}</strong>`;
+
+            // Image column
+            let imageHtml = '';
+            if (i.fimage && i.fimage !== '') {
+                // Try to find the image
+                const imagePath = '../' + i.fimage;
+                imageHtml = `<img src="${imagePath}" width="40" height="40" style="border-radius:6px; object-fit:cover;" onerror="this.style.display='none'">`;
+            } else {
+                // Try default images
+                const fid = i.oid; // This might not be accurate, we need to get fid from somewhere else
+                // For now, show placeholder
+                imageHtml = `<i class="fas fa-chair" style="font-size:1.5rem; color:#d4a373;"></i>`;
+            }
+            r.insertCell(2).innerHTML = imageHtml;
+            r.insertCell(3).innerText = i.item;
+            r.insertCell(4).innerText = i.qty;
+            r.insertCell(5).innerHTML = `$${parseFloat(i.unit_price).toFixed(2)}`;
+            r.insertCell(6).innerHTML = `<strong>$${parseFloat(i.total).toFixed(2)}</strong>`;
         });
 
         const daily = {};
