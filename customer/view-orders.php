@@ -17,18 +17,30 @@ if (isset($_SESSION['role']) && $_SESSION['role'] === 'staff') {
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'] ?? 'Customer';
 
+// ===== SORTING PARAMETERS =====
+$sort_by = isset($_GET['sort']) ? $_GET['sort'] : 'oid';
+$sort_order = isset($_GET['order']) ? $_GET['order'] : 'DESC';
+
+// Allowed sort columns (for security)
+$allowed_sort = ['oid', 'odate', 'odeliverydate', 'status', 'ototalamount', 'fname'];
+if (!in_array($sort_by, $allowed_sort)) {
+    $sort_by = 'oid';
+}
+$sort_order = ($sort_order === 'ASC') ? 'ASC' : 'DESC';
+
 // ===== USE conn.php =====
 require_once '../conn.php';
 
 $orders = [];
 try {
-    // Fetch orders with product details
-    $stmt = $pdo->prepare("SELECT o.oid, o.status, o.odate, of.fid, of.oqty, f.fname, f.fprice 
-                            FROM orders o
-                            JOIN orderfurnitures of ON o.oid = of.oid
-                            JOIN furnitures f ON of.fid = f.fid
-                            WHERE o.cid = ? 
-                            ORDER BY o.oid DESC");
+    // Fetch orders with ALL required fields
+    $query = "SELECT o.oid, o.cid, o.status, o.odate, o.odeliverydate, of.fid, of.oqty, f.fname, f.fprice, o.ototalamount
+              FROM orders o
+              JOIN orderfurnitures of ON o.oid = of.oid
+              JOIN furnitures f ON of.fid = f.fid
+              WHERE o.cid = ? 
+              ORDER BY $sort_by $sort_order";
+    $stmt = $pdo->prepare($query);
     $stmt->execute([$user_id]);
     $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
@@ -174,6 +186,47 @@ try {
             margin-top: 0.3rem;
         }
 
+        /* ===== SORT CONTROLS ===== */
+        .sort-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            padding: 1rem 2rem;
+            background: var(--cream);
+            border-bottom: 1px solid var(--input-border);
+        }
+
+        .sort-controls label {
+            font-weight: 600;
+            color: var(--wood-dark);
+            font-size: 0.85rem;
+        }
+
+        .sort-controls label i {
+            color: var(--accent-gold);
+            margin-right: 0.3rem;
+        }
+
+        .sort-controls select {
+            padding: 0.4rem 0.8rem;
+            border: 1.5px solid var(--input-border);
+            border-radius: 0.5rem;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            color: var(--wood-dark);
+            background: white;
+            outline: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 200px;
+        }
+
+        .sort-controls select:focus {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.15);
+        }
+
         /* ===== TABLE ===== */
         .table-container {
             overflow-x: auto;
@@ -191,19 +244,19 @@ try {
         }
 
         .table-container th {
-            padding: 0.8rem 1.2rem;
+            padding: 0.8rem 1rem;
             text-align: center;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             white-space: nowrap;
         }
 
         .table-container td {
-            padding: 0.8rem 1.2rem;
+            padding: 0.8rem 1rem;
             text-align: center;
             border-bottom: 1px solid rgba(0,0,0,0.05);
             color: var(--wood-dark);
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             vertical-align: middle;
         }
 
@@ -216,51 +269,28 @@ try {
             display: inline-block;
             padding: 0.25rem 1rem;
             border-radius: 2rem;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 600;
         }
 
-        .badge-pending {
-            background: #fef3e2;
-            color: #8a5a2a;
-        }
-
-        .badge-open {
-            background: #f1f3f4;
-            color: #5f6368;
-        }
-
-        .badge-processing {
-            background: #fef7e0;
-            color: #b06000;
-        }
-
-        .badge-delivered {
-            background: #e6f4ea;
-            color: #137333;
-        }
-
-        .badge-completed {
-            background: #e8f0fe;
-            color: #1a73e8;
-        }
-
-        .badge-cancelled {
-            background: #fce4e4;
-            color: #cc0000;
-        }
+        .badge-pending { background: #fef3e2; color: #8a5a2a; }
+        .badge-open { background: #f1f3f4; color: #5f6368; }
+        .badge-processing { background: #fef7e0; color: #b06000; }
+        .badge-delivered { background: #e6f4ea; color: #137333; }
+        .badge-completed { background: #e8f0fe; color: #1a73e8; }
+        .badge-cancelled { background: #fce4e4; color: #cc0000; }
 
         /* ===== BUTTONS ===== */
         .btn {
             display: inline-block;
-            padding: 0.4rem 1rem;
+            padding: 0.3rem 0.8rem;
             border: none;
             border-radius: var(--radius-btn);
             cursor: pointer;
             font-weight: 600;
             text-decoration: none;
             transition: all 0.3s ease;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             text-align: center;
             font-family: 'Inter', sans-serif;
         }
@@ -314,7 +344,7 @@ try {
         /* ===== RESPONSIVE ===== */
         @media (max-width: 1024px) {
             .table-container table {
-                min-width: 800px;
+                min-width: 900px;
             }
         }
 
@@ -341,6 +371,18 @@ try {
 
             .card-header h2 {
                 font-size: 1.1rem;
+            }
+
+            .sort-controls {
+                flex-direction: column;
+                align-items: stretch;
+                padding: 1rem;
+                gap: 0.5rem;
+            }
+
+            .sort-controls select {
+                width: 100%;
+                min-width: unset;
             }
         }
 
@@ -378,15 +420,38 @@ try {
             <p>View all your past and current orders</p>
         </div>
 
+        <!-- ===== SORT CONTROLS ===== -->
+        <div class="sort-controls">
+            <div>
+                <i class="fas fa-sort"></i>
+                <label for="sortSelect">Sort by:</label>
+            </div>
+            <select id="sortSelect" onchange="window.location.href=this.value">
+                <option value="?sort=oid&order=DESC" <?php echo ($sort_by === 'oid' && $sort_order === 'DESC') ? 'selected' : ''; ?>>Order ID (Newest First)</option>
+                <option value="?sort=oid&order=ASC" <?php echo ($sort_by === 'oid' && $sort_order === 'ASC') ? 'selected' : ''; ?>>Order ID (Oldest First)</option>
+                <option value="?sort=odate&order=DESC" <?php echo ($sort_by === 'odate' && $sort_order === 'DESC') ? 'selected' : ''; ?>>Date (Newest First)</option>
+                <option value="?sort=odate&order=ASC" <?php echo ($sort_by === 'odate' && $sort_order === 'ASC') ? 'selected' : ''; ?>>Date (Oldest First)</option>
+                <option value="?sort=odeliverydate&order=DESC" <?php echo ($sort_by === 'odeliverydate' && $sort_order === 'DESC') ? 'selected' : ''; ?>>Delivery Date (Latest First)</option>
+                <option value="?sort=odeliverydate&order=ASC" <?php echo ($sort_by === 'odeliverydate' && $sort_order === 'ASC') ? 'selected' : ''; ?>>Delivery Date (Earliest First)</option>
+                <option value="?sort=fname&order=ASC" <?php echo ($sort_by === 'fname' && $sort_order === 'ASC') ? 'selected' : ''; ?>>Product (A-Z)</option>
+                <option value="?sort=fname&order=DESC" <?php echo ($sort_by === 'fname' && $sort_order === 'DESC') ? 'selected' : ''; ?>>Product (Z-A)</option>
+                <option value="?sort=status&order=ASC" <?php echo ($sort_by === 'status' && $sort_order === 'ASC') ? 'selected' : ''; ?>>Status (A-Z)</option>
+                <option value="?sort=status&order=DESC" <?php echo ($sort_by === 'status' && $sort_order === 'DESC') ? 'selected' : ''; ?>>Status (Z-A)</option>
+                <option value="?sort=ototalamount&order=DESC" <?php echo ($sort_by === 'ototalamount' && $sort_order === 'DESC') ? 'selected' : ''; ?>>Amount (Highest First)</option>
+                <option value="?sort=ototalamount&order=ASC" <?php echo ($sort_by === 'ototalamount' && $sort_order === 'ASC') ? 'selected' : ''; ?>>Amount (Lowest First)</option>
+            </select>
+        </div>
+
         <div class="table-container">
             <table>
                 <thead>
                 <tr>
                     <th>Order ID</th>
                     <th>Date</th>
+                    <th>Delivery Date</th>
                     <th>Product</th>
+                    <th>Furniture ID</th>
                     <th>Quantity</th>
-                    <th>Price</th>
                     <th>Total</th>
                     <th>Status</th>
                     <th>Action</th>
@@ -395,7 +460,7 @@ try {
                 <tbody>
                 <?php if (empty($orders)): ?>
                     <tr>
-                        <td colspan="8">
+                        <td colspan="9">
                             <div class="empty-state">
                                 <i class="fas fa-inbox"></i>
                                 <h3>No Orders Yet</h3>
@@ -408,7 +473,6 @@ try {
                     </tr>
                 <?php else: ?>
                     <?php foreach ($orders as $order):
-                        $total = $order['oqty'] * $order['fprice'];
                         $status = strtolower($order['status'] ?? 'open');
                         $badge_class = 'badge-' . $status;
                         if ($status === 'pending' || $status === 'open') $badge_class = 'badge-pending';
@@ -420,10 +484,11 @@ try {
                         <tr>
                             <td><strong>#<?php echo $order['oid']; ?></strong></td>
                             <td><?php echo date('Y-m-d', strtotime($order['odate'])); ?></td>
+                            <td><?php echo date('Y-m-d', strtotime($order['odeliverydate'])); ?></td>
                             <td><?php echo htmlspecialchars($order['fname']); ?></td>
+                            <td>#<?php echo $order['fid']; ?></td>
                             <td><?php echo $order['oqty']; ?></td>
-                            <td>$<?php echo number_format($order['fprice'], 2); ?></td>
-                            <td><strong>$<?php echo number_format($total, 2); ?></strong></td>
+                            <td><strong>$<?php echo number_format($order['ototalamount'], 2); ?></strong></td>
                             <td>
                                     <span class="badge <?php echo $badge_class; ?>">
                                         <?php echo htmlspecialchars($order['status']); ?>
@@ -431,7 +496,7 @@ try {
                             </td>
                             <td>
                                 <a href="view-order-details.php?oid=<?php echo $order['oid']; ?>" class="btn btn-primary">
-                                    <i class="fas fa-eye"></i> View
+                                    <i class="fas fa-eye"></i>
                                 </a>
                             </td>
                         </tr>

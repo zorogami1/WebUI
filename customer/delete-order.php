@@ -27,47 +27,84 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['oid'])) {
     $order_id = intval($_POST['oid']);
 
     try {
-        // Check if order can be deleted (only if status is Open or Pending)
-        $check_stmt = $pdo->prepare("SELECT status FROM orders WHERE oid = ? AND cid = ?");
+        // Check order details (status, delivery date)
+        $check_stmt = $pdo->prepare("SELECT status, odeliverydate FROM orders WHERE oid = ? AND cid = ?");
         $check_stmt->execute([$order_id, $user_id]);
         $order = $check_stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($order && ($order['status'] === 'Open' || $order['status'] === 'Pending')) {
-            // Start transaction
-            $pdo->beginTransaction();
-
-            // First delete from orderfurnitures
-            $stmt1 = $pdo->prepare("DELETE FROM orderfurnitures WHERE oid = ?");
-            $stmt1->execute([$order_id]);
-
-            // Then delete from orders
-            $stmt2 = $pdo->prepare("DELETE FROM orders WHERE oid = ? AND cid = ?");
-            $stmt2->execute([$order_id, $user_id]);
-
-            if ($stmt2->rowCount() > 0) {
-                $pdo->commit();
-                $message = "Order #$order_id was successfully cancelled and removed.";
-                $message_type = "alert-success";
-            } else {
-                $pdo->rollBack();
-                $message = "Could not delete order. It may have already been processed or removed.";
-                $message_type = "alert-warning";
-            }
-        } else {
+        if (!$order) {
+            $message = "Order not found.";
+            $message_type = "alert-warning";
+        } elseif ($order['status'] !== 'Open' && $order['status'] !== 'Pending') {
             $message = "This order cannot be cancelled because it has already been processed.";
             $message_type = "alert-warning";
+        } else {
+            // ===== CHECK 2-DAY DELIVERY RULE =====
+            $delivery_date = new DateTime($order['odeliverydate']);
+            $today = new DateTime();
+            $diff = $today->diff($delivery_date)->days;
+
+            if ($delivery_date < $today) {
+                $message = "This order has already passed its delivery date. Cannot cancel.";
+                $message_type = "alert-warning";
+            } elseif ($diff < 2) {
+                $message = "This order cannot be cancelled because delivery is less than 2 days away. (Delivery: " . date('Y-m-d', strtotime($order['odeliverydate'])) . ")";
+                $message_type = "alert-warning";
+            } else {
+                // ===== PROCEED WITH DELETION =====
+                $pdo->beginTransaction();
+
+                // 1. Get furniture items and quantities from the order
+                $items_stmt = $pdo->prepare("SELECT fid, oqty FROM orderfurnitures WHERE oid = ?");
+                $items_stmt->execute([$order_id]);
+                $order_items = $items_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                // 2. Restore material stock for each item
+                foreach ($order_items as $item) {
+                    // Get materials needed for this furniture
+                    $mat_stmt = $pdo->prepare("SELECT mid, pmqty FROM furniturematerials WHERE fid = ?");
+                    $mat_stmt->execute([$item['fid']]);
+                    $materials = $mat_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    foreach ($materials as $mat) {
+                        $stock_to_add = $mat['pmqty'] * $item['oqty'];
+                        $update_stmt = $pdo->prepare("UPDATE materials SET mqty = mqty + ? WHERE mid = ?");
+                        $update_stmt->execute([$stock_to_add, $mat['mid']]);
+                    }
+                }
+
+                // 3. Delete from orderfurnitures
+                $stmt1 = $pdo->prepare("DELETE FROM orderfurnitures WHERE oid = ?");
+                $stmt1->execute([$order_id]);
+
+                // 4. Delete from orders
+                $stmt2 = $pdo->prepare("DELETE FROM orders WHERE oid = ? AND cid = ?");
+                $stmt2->execute([$order_id, $user_id]);
+
+                if ($stmt2->rowCount() > 0) {
+                    $pdo->commit();
+                    $message = "Order #$order_id was successfully cancelled and removed. Stock has been restored.";
+                    $message_type = "alert-success";
+                } else {
+                    $pdo->rollBack();
+                    $message = "Could not delete order. It may have already been processed or removed.";
+                    $message_type = "alert-warning";
+                }
+            }
         }
     } catch (PDOException $e) {
-        $pdo->rollBack();
+        if (isset($pdo)) {
+            $pdo->rollBack();
+        }
         $message = "Error cancelling order: " . $e->getMessage();
         $message_type = "alert-danger";
     }
 }
 
-// Fetch Active Orders
+// Fetch Active Orders with delivery date
 $orders = [];
 try {
-    $stmt = $pdo->prepare("SELECT o.oid, of.fid, f.fname 
+    $stmt = $pdo->prepare("SELECT o.oid, o.odeliverydate, of.fid, f.fname 
                             FROM orders o
                             JOIN orderfurnitures of ON o.oid = of.oid
                             JOIN furnitures f ON of.fid = f.fid
@@ -212,20 +249,16 @@ try {
             margin-right: 0.5rem;
         }
 
-        .card-header p {
-            color: var(--gray-wood);
-            font-size: 0.85rem;
-            margin-top: 0.3rem;
-        }
-
         .card-header .warning-text {
             color: #e74c3c;
             font-size: 0.9rem;
             margin-top: 0.3rem;
         }
 
-        .card-body {
-            padding: 1.5rem 2rem;
+        .card-header .info-text {
+            color: var(--wood-light);
+            font-size: 0.85rem;
+            margin-top: 0.2rem;
         }
 
         /* ===== TABLE ===== */
@@ -300,6 +333,18 @@ try {
             box-shadow: 0 4px 15px rgba(204, 0, 0, 0.4);
         }
 
+        .btn-disabled {
+            background: var(--gray-wood);
+            color: white;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        .btn-disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
         /* ===== ALERTS ===== */
         .alert {
             padding: 0.8rem 1rem;
@@ -348,6 +393,25 @@ try {
             margin-bottom: 0.5rem;
         }
 
+        /* ===== DELIVERY DATE BADGE ===== */
+        .delivery-badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+
+        .delivery-soon {
+            background: #fef3e2;
+            color: #b06000;
+        }
+
+        .delivery-ok {
+            background: #e6f4ea;
+            color: #137333;
+        }
+
         /* ===== FOOTER ===== */
         footer {
             background: var(--wood-dark);
@@ -389,16 +453,12 @@ try {
                 font-size: 1.1rem;
             }
 
-            .card-body {
-                padding: 1rem;
-            }
-
             .alert {
                 margin: 1rem 1rem 0;
             }
 
             .table-container table {
-                min-width: 400px;
+                min-width: 500px;
             }
         }
 
@@ -439,6 +499,7 @@ try {
         <div class="card-header">
             <h2><i class="fas fa-trash-alt"></i> Cancel Pending Orders</h2>
             <p class="warning-text"><i class="fas fa-exclamation-triangle"></i> Only orders with status "Open" or "Pending" can be cancelled.</p>
+            <p class="info-text"><i class="fas fa-clock"></i> Orders can only be cancelled if delivery date is at least 2 days away.</p>
         </div>
 
         <?php if (!empty($message)): ?>
@@ -453,13 +514,14 @@ try {
                 <tr>
                     <th>Order ID</th>
                     <th>Product Name</th>
+                    <th>Delivery Date</th>
                     <th>Action</th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($orders)): ?>
                     <tr>
-                        <td colspan="3">
+                        <td colspan="4">
                             <div class="empty-state">
                                 <i class="fas fa-folder-open"></i>
                                 <h3>No Orders to Cancel</h3>
@@ -471,17 +533,48 @@ try {
                         </td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($orders as $order): ?>
+                    <?php foreach ($orders as $order):
+                        $delivery_date = new DateTime($order['odeliverydate']);
+                        $today = new DateTime();
+                        $diff = $today->diff($delivery_date)->days;
+                        $can_delete = ($delivery_date > $today && $diff >= 2);
+                        $is_past = ($delivery_date < $today);
+                        ?>
                         <tr>
                             <td><strong>#<?php echo $order['oid']; ?></strong></td>
                             <td><?php echo htmlspecialchars($order['fname']); ?></td>
                             <td>
-                                <form action="" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order? This action cannot be undone.');">
-                                    <input type="hidden" name="oid" value="<?php echo $order['oid']; ?>">
-                                    <button type="submit" class="btn btn-danger">
-                                        <i class="fas fa-times"></i> Cancel Order
+                                    <span class="delivery-badge <?php echo $can_delete ? 'delivery-ok' : ($is_past ? 'delivery-soon' : 'delivery-soon'); ?>">
+                                        <?php echo date('Y-m-d', strtotime($order['odeliverydate'])); ?>
+                                        <?php if ($can_delete): ?>
+                                            <i class="fas fa-check-circle"></i>
+                                        <?php elseif ($is_past): ?>
+                                            <i class="fas fa-times-circle"></i> (Passed)
+                                        <?php else: ?>
+                                            <i class="fas fa-clock"></i> (<?php echo $diff; ?> days)
+                                        <?php endif; ?>
+                                    </span>
+                            </td>
+                            <td>
+                                <?php if ($can_delete): ?>
+                                    <form action="" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order? This will restore material stock and cannot be undone.');">
+                                        <input type="hidden" name="oid" value="<?php echo $order['oid']; ?>">
+                                        <button type="submit" class="btn btn-danger">
+                                            <i class="fas fa-times"></i> Cancel Order
+                                        </button>
+                                    </form>
+                                <?php else: ?>
+                                    <button class="btn btn-disabled" disabled>
+                                        <i class="fas fa-ban"></i> Cannot Cancel
                                     </button>
-                                </form>
+                                    <div style="font-size: 0.7rem; color: var(--gray-wood); margin-top: 3px;">
+                                        <?php if ($is_past): ?>
+                                            Delivery date has passed
+                                        <?php else: ?>
+                                            Less than 2 days until delivery
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
                             </td>
                         </tr>
                     <?php endforeach; ?>
