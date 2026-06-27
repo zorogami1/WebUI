@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 Your unique Customer ID is: <span style="font-size: 1.4rem; color: #8b5e3c;"><?php echo $new_cid; ?></span>
             </div>
             <p style="font-size: 0.85rem; color: #555;">Please write down this ID number. Use either this ID or your full name to log into the system.</p>
-            <a href="login.php" class="btn btn-primary" style="display:inline-block; margin-top:1rem; text-decoration:none; padding:0.6rem 2rem;">Proceed to Login</a>
+            <a href="../login.php" class="btn btn-primary" style="display:inline-block; margin-top:1rem; text-decoration:none; padding:0.6rem 2rem;">Proceed to Login</a>
         </div>
     <?php else: ?>
 
@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <div class="form-footer">
-            Already have an account? <a href="login.php" style="color: #8b5e3c; font-weight: bold;">Log In Here</a>
+            Already have an account? <a href="../login.php" style="color: #8b5e3c; font-weight: bold;">Log In Here</a>
         </div>
     <?php endif; ?>
 </div>

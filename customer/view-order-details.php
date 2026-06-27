@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // 1. ROUTE SECURITY GUARD CHECK
 if (!isset($_SESSION['cid'])) {
-    die("<h3>Access Denied: You must be logged in to view this page.</h3><p><a href='login.php'>Go to Login</a></p>");
+    die("<h3>Access Denied: You must be logged in to view this page.</h3><p><a href='../login.php'>Go to Login</a></p>");
 }
 
 // Include database connection file
