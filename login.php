@@ -133,11 +133,40 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             max-width: 480px;
             padding: 2.5rem;
             box-sizing: border-box;
+            position: relative;
+        }
+
+        /* ===== HOME BUTTON ===== */
+        .home-btn {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            color: var(--wood-light);
+            font-size: 1.2rem;
+            text-decoration: none;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 0.8rem;
+            background: rgba(139, 94, 60, 0.08);
+        }
+
+        .home-btn:hover {
+            color: var(--wood-dark);
+            background: rgba(139, 94, 60, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .home-btn i {
+            font-size: 1rem;
         }
 
         .login-header {
             text-align: center;
             margin-bottom: 2rem;
+            margin-top: 0.5rem;
         }
 
         .login-header .icon {
@@ -298,6 +327,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             .login-header h2 {
                 font-size: 1.5rem;
             }
+
+            .home-btn {
+                top: 0.8rem;
+                left: 0.8rem;
+                font-size: 1rem;
+                padding: 0.3rem 0.6rem;
+            }
+
+            .home-btn span {
+                display: none;
+            }
         }
 
         @media (max-width: 400px) {
@@ -319,6 +359,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <body>
 
 <div class="login-container">
+    <!-- ===== HOME BUTTON ===== -->
+    <a href="index.php" class="home-btn" title="Back to Home">
+        <i class="fas fa-home"></i>
+        <span>Home</span>
+    </a>
+
     <div class="login-header">
         <div class="icon"><i class="fas fa-tree"></i></div>
         <h2>Welcome Back</h2>
