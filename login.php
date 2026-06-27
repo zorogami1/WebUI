@@ -29,8 +29,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $role = '';
 
             // First, check if user is a CUSTOMER
-            $stmt = $conn->prepare("SELECT cid as id, cname as full_name, cpassword as password, 'customer' as role FROM customers WHERE cname = ?");
-            $stmt->bind_param("s", $username);
+            $stmt = $conn->prepare("SELECT cid as id, cname as full_name, cpassword as password, 'customer' as role FROM customers WHERE cname = ? OR ctel = ?");
+            $stmt->bind_param("ss", $username, $username);
             $stmt->execute();
             $result = $stmt->get_result();
 
@@ -60,34 +60,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if (!$user_found) {
                 $error_message = "No account found with this username or email. Please register first.";
             } else {
-                // Verify the password (plain text comparison for your database)
-                if ($password === $user_data['password']) {
+                // ===== FIXED: Use password_verify() for hashed passwords =====
+                if (password_verify($password, $user_data['password'])) {
                     // Store session data
                     $_SESSION['user_id'] = intval($user_data['id']);
                     $_SESSION['full_name'] = $user_data['full_name'];
                     $_SESSION['role'] = $role;
 
-                    // ===== FIXED: ROLE-BASED REDIRECT with absolute paths =====
+                    // ===== ROLE-BASED REDIRECT =====
                     if ($role === 'staff') {
-                        // Try multiple path options
-                        if (file_exists(__DIR__ . '/staff/dashboard.php')) {
-                            header("Location: staff/dashboard.php");
-                        } elseif (file_exists(__DIR__ . '/../staff/dashboard.php')) {
-                            header("Location: ../staff/dashboard.php");
-                        } else {
-                            // Fallback - use full URL
-                            header("Location: /WebUI/staff/dashboard.php");
-                        }
+                        header("Location: staff/dashboard.php");
                     } else {
-                        // Try multiple path options for customer
-                        if (file_exists(__DIR__ . '/customer/dashboard.php')) {
-                            header("Location: customer/dashboard.php");
-                        } elseif (file_exists(__DIR__ . '/../customer/dashboard.php')) {
-                            header("Location: ../customer/dashboard.php");
-                        } else {
-                            // Fallback - use full URL
-                            header("Location: /WebUI/customer/dashboard.php");
-                        }
+                        header("Location: customer/dashboard.php");
                     }
                     exit();
                 } else {
