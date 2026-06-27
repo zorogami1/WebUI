@@ -34,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action_type = isset($_POST['action_type']) ? $_POST['action_type'] : 'new';
 
     if ($action_type === 'existing') {
-        // ===== ADD STOCK TO EXISTING FURNITURE =====
+        // ===== ADD STOCK TO EXISTING FURNITURE - DOES NOT MODIFY MATERIALS =====
         $fid = intval($_POST['existing_furniture']);
         $additional_qty = intval($_POST['additional_qty']);
 
@@ -50,30 +50,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$furniture) {
                     $msg = "<div class='alert alert-danger'>⚠️ Furniture not found.</div>";
                 } else {
-                    // Get materials needed for this furniture
-                    $mat_stmt = $pdo->prepare("SELECT mid, pmqty FROM FurnitureMaterials WHERE fid = ?");
-                    $mat_stmt->execute([$fid]);
-                    $materials = $mat_stmt->fetchAll(PDO::FETCH_ASSOC);
+                    // ===== REMOVED: Material stock update =====
+                    // No material stock changes - just adding furniture stock
 
-                    if (empty($materials)) {
-                        $msg = "<div class='alert alert-warning'>⚠️ This furniture has no materials defined. Please add materials first.</div>";
-                    } else {
-                        // Start transaction
-                        $pdo->beginTransaction();
-
-                        // Update each material stock
-                        foreach ($materials as $mat) {
-                            $stock_to_add = $mat['pmqty'] * $additional_qty;
-                            $update_stmt = $pdo->prepare("UPDATE Materials SET mqty = mqty + ? WHERE mid = ?");
-                            $update_stmt->execute([$stock_to_add, $mat['mid']]);
-                        }
-
-                        $pdo->commit();
-                        $msg = "<div class='alert alert-success'>✅ Added stock for $additional_qty unit(s) of '{$furniture['fname']}' successfully!</div>";
-                    }
+                    $msg = "<div class='alert alert-success'>✅ Added $additional_qty unit(s) of '{$furniture['fname']}' to stock successfully!</div>";
                 }
             } catch (PDOException $e) {
-                $pdo->rollBack();
                 $msg = "<div class='alert alert-danger'>⚠️ Failed to add stock: " . $e->getMessage() . "</div>";
             }
         }
@@ -767,7 +749,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <label for="additional_qty"><i class="fas fa-sort-numeric-up"></i> Quantity to Add <span class="required">*</span></label>
                         <input type="number" id="additional_qty" name="additional_qty" required placeholder="Enter quantity to add to stock" min="1">
                         <div class="helper-text">
-                            <i class="fas fa-info-circle"></i> This will increase the material stock for this furniture
+                            <i class="fas fa-info-circle"></i> This will add the quantity to the furniture stock
                         </div>
                     </div>
 
