@@ -93,11 +93,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
 
                 $pdo->commit();
 
-                $message = "Order placed successfully! Order #$oid has been created.";
+                $message = "✅ Order placed successfully! Order #$oid has been created.";
                 $message_type = "alert-success";
 
-                // Redirect after 2 seconds
-                echo "<script>setTimeout(() => { window.location.href = 'view-orders.php'; }, 2000);</script>";
+                // ===== REMOVED: Auto-redirect to view-orders.php =====
+                // Stay on current page - user can continue shopping
             } else {
                 $message = $stock_warning;
                 $message_type = "alert-warning";

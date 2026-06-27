@@ -14,7 +14,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role
 require_once '../conn.php';
 $msg = "";
 
-// ===== FIXED: Define material types/categories - removed trailing comma =====
+// ===== FIXED: Define material types/categories =====
 $material_types = [
         'Wood' => 'Wood',
         'Metal' => 'Metal',
@@ -28,27 +28,78 @@ $material_types = [
         'Other' => 'Other'
 ];
 
+// Fetch existing materials for dropdown
+$existing_materials = [];
+try {
+    $existing_materials = $pdo->query("SELECT mid, mname, munit, mqty FROM materials ORDER BY mname ASC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $existing_materials = [];
+}
+
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $mname = trim($_POST['mname']);
-    $mtype = trim($_POST['mtype']);
-    $mqty = intval($_POST['mqty']);
-    $munit = trim($_POST['munit']);
+    $action_type = isset($_POST['action_type']) ? $_POST['action_type'] : 'new';
 
-    if (empty($mname) || empty($mtype) || empty($munit)) {
-        $msg = "<div class='alert alert-danger'>⚠️ Please fill in all required fields.</div>";
+    if ($action_type === 'existing') {
+        // ===== ADD TO EXISTING MATERIAL =====
+        $mid = intval($_POST['existing_material']);
+        $additional_qty = intval($_POST['additional_qty']);
+
+        if ($mid <= 0 || $additional_qty <= 0) {
+            $msg = "<div class='alert alert-danger'>⚠️ Please select a material and enter a valid quantity.</div>";
+        } else {
+            try {
+                // Check if material exists
+                $check_stmt = $pdo->prepare("SELECT mname FROM materials WHERE mid = ?");
+                $check_stmt->execute([$mid]);
+                $material = $check_stmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($material) {
+                    // Update quantity
+                    $stmt = $pdo->prepare("UPDATE materials SET mqty = mqty + ? WHERE mid = ?");
+                    $stmt->execute([$additional_qty, $mid]);
+                    $msg = "<div class='alert alert-success'>✅ Added $additional_qty units to '{$material['mname']}' successfully!</div>";
+                } else {
+                    $msg = "<div class='alert alert-danger'>⚠️ Material not found.</div>";
+                }
+            } catch (PDOException $e) {
+                $msg = "<div class='alert alert-danger'>⚠️ Failed to update material: " . $e->getMessage() . "</div>";
+            }
+        }
     } else {
-        try {
-            $stmt = $pdo->prepare("INSERT INTO Materials (mname, mtype, mqty, munit) VALUES (:mname, :mtype, :mqty, :munit)");
-            $stmt->execute([
-                    'mname' => $mname,
-                    'mtype' => $mtype,
-                    'mqty' => $mqty,
-                    'munit' => $munit
-            ]);
-            $msg = "<div class='alert alert-success'>✅ Material added successfully! (ID: " . $pdo->lastInsertId() . ")</div>";
-        } catch (PDOException $e) {
-            $msg = "<div class='alert alert-danger'>⚠️ Failed to add material: " . $e->getMessage() . "</div>";
+        // ===== ADD NEW MATERIAL =====
+        $mname = trim($_POST['mname']);
+        $mtype = trim($_POST['mtype']);
+        $mqty = intval($_POST['mqty']);
+        $munit = trim($_POST['munit']);
+
+        if (empty($mname) || empty($mtype) || empty($munit)) {
+            $msg = "<div class='alert alert-danger'>⚠️ Please fill in all required fields.</div>";
+        } else {
+            // Check if material already exists
+            $check_stmt = $pdo->prepare("SELECT mid FROM materials WHERE mname = ?");
+            $check_stmt->execute([$mname]);
+            $existing = $check_stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                $msg = "<div class='alert alert-warning'>⚠️ Material '$mname' already exists. Use 'Add to Existing' option instead.</div>";
+            } else {
+                try {
+                    $stmt = $pdo->prepare("INSERT INTO materials (mname, mtype, mqty, munit) VALUES (:mname, :mtype, :mqty, :munit)");
+                    $stmt->execute([
+                            'mname' => $mname,
+                            'mtype' => $mtype,
+                            'mqty' => $mqty,
+                            'munit' => $munit
+                    ]);
+                    $msg = "<div class='alert alert-success'>✅ Material added successfully! (ID: " . $pdo->lastInsertId() . ")</div>";
+
+                    // Refresh existing materials list
+                    $existing_materials = $pdo->query("SELECT mid, mname, munit, mqty FROM materials ORDER BY mname ASC")->fetchAll(PDO::FETCH_ASSOC);
+                } catch (PDOException $e) {
+                    $msg = "<div class='alert alert-danger'>⚠️ Failed to add material: " . $e->getMessage() . "</div>";
+                }
+            }
         }
     }
 }
@@ -198,6 +249,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 2rem;
         }
 
+        /* ===== TAB SWITCHER ===== */
+        .tab-switcher {
+            display: flex;
+            background: var(--wood-bg);
+            border-radius: 0.8rem;
+            padding: 0.3rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--input-border);
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 0.6rem;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            font-family: 'Inter', sans-serif;
+            background: transparent;
+            color: var(--gray-wood);
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-gold);
+            color: var(--wood-dark);
+            box-shadow: 0 2px 10px rgba(212, 163, 115, 0.3);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(212, 163, 115, 0.1);
+            color: var(--wood-dark);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
         /* ===== FORM ===== */
         .form-group {
             margin-bottom: 1.2rem;
@@ -275,6 +375,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background: #c49363;
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(212, 163, 115, 0.4);
+        }
+
+        .btn-success {
+            background: #2a9d8f;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #21867a;
+            transform: translateY(-2px);
         }
 
         /* ===== ALERTS ===== */
@@ -364,6 +474,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-top: 0.5rem;
         }
 
+        /* ===== CURRENT STOCK DISPLAY ===== */
+        .stock-display {
+            padding: 0.5rem 0.8rem;
+            background: var(--wood-bg);
+            border-radius: 0.5rem;
+            font-size: 0.8rem;
+            color: var(--gray-wood);
+            margin-top: 0.3rem;
+        }
+
+        .stock-display strong {
+            color: var(--wood-dark);
+        }
+
         /* ===== FOOTER ===== */
         footer {
             background: var(--wood-dark);
@@ -421,6 +545,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             .alert {
                 margin: 1rem 1rem 0;
             }
+
+            .tab-switcher {
+                flex-direction: column;
+                gap: 0.3rem;
+            }
         }
 
         @media (max-width: 480px) {
@@ -462,76 +591,119 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="container">
     <div class="card">
         <div class="card-header">
-            <h2><i class="fas fa-warehouse"></i> Add New Material</h2>
-            <p>Material ID will be generated automatically</p>
+            <h2><i class="fas fa-warehouse"></i> Manage Materials</h2>
+            <p>Add new material or increase quantity of existing materials</p>
         </div>
 
         <?php echo $msg; ?>
 
         <div class="card-body">
-            <form action="insert-material.php" method="POST">
-                <!-- Material Name -->
-                <div class="form-group">
-                    <label for="mname"><i class="fas fa-tag"></i> Material Name *</label>
-                    <input type="text" id="mname" name="mname" required placeholder="Enter material name (e.g., Oak Wood Plank)">
-                </div>
-
-                <!-- Material Type Dropdown -->
-                <div class="form-group">
-                    <label for="mtype"><i class="fas fa-category"></i> Material Type / Category *</label>
-                    <select id="mtype" name="mtype" required style="width:100%;">
-                        <option value="">-- Select Material Type --</option>
-                        <?php foreach ($material_types as $key => $label): ?>
-                            <option value="<?php echo $key; ?>">
-                                <?php echo $label; ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div class="helper-text">
-                        <i class="fas fa-info-circle"></i> Select the category that best describes this material
-                    </div>
-                </div>
-
-                <!-- Quantity and Unit in two columns -->
-                <div class="form-row-two">
-                    <div class="form-group">
-                        <label for="mqty"><i class="fas fa-sort-numeric-up"></i> Quantity *</label>
-                        <input type="number" id="mqty" name="mqty" required placeholder="Enter quantity" min="0" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label for="munit"><i class="fas fa-ruler"></i> Unit of Measurement *</label>
-                        <select id="munit" name="munit" required style="width:100%;">
-                            <option value="">-- Select Unit --</option>
-                            <option value="pcs">Pieces (pcs)</option>
-                            <option value="meter">Meters (m)</option>
-                            <option value="centimeter">Centimeters (cm)</option>
-                            <option value="kilogram">Kilograms (kg)</option>
-                            <option value="gram">Grams (g)</option>
-                            <option value="liter">Liters (L)</option>
-                            <option value="milliliter">Milliliters (mL)</option>
-                            <option value="square meter">Square Meters (m²)</option>
-                            <option value="cubic meter">Cubic Meters (m³)</option>
-                            <option value="roll">Rolls</option>
-                            <option value="sheet">Sheets</option>
-                            <option value="set">Sets</option>
-                            <option value="box">Boxes</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Material Type Preview -->
-                <div class="type-preview" id="typePreview">
-                    <span style="font-weight: 600;">Selected Type:</span>
-                    <span id="selectedTypeDisplay" style="font-weight: 400;"></span>
-                </div>
-
-                <button type="submit" class="btn btn-primary" style="width:100%; margin-top: 0.5rem;">
-                    <i class="fas fa-plus-circle"></i> Add Material to Inventory
+            <!-- ===== TAB SWITCHER ===== -->
+            <div class="tab-switcher">
+                <button class="tab-btn active" onclick="switchTab('new')">
+                    <i class="fas fa-plus-circle"></i> New Material
                 </button>
-            </form>
+                <button class="tab-btn" onclick="switchTab('existing')">
+                    <i class="fas fa-plus"></i> Add to Existing
+                </button>
+            </div>
 
-            <!-- Quick Reference Table -->
+            <!-- ===== TAB 1: ADD NEW MATERIAL ===== -->
+            <div id="tab-new" class="tab-content active">
+                <form action="insert-material.php" method="POST">
+                    <input type="hidden" name="action_type" value="new">
+
+                    <div class="form-group">
+                        <label for="mname"><i class="fas fa-tag"></i> Material Name *</label>
+                        <input type="text" id="mname" name="mname" required placeholder="Enter material name (e.g., Oak Wood Plank)">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mtype"><i class="fas fa-category"></i> Material Type / Category *</label>
+                        <select id="mtype" name="mtype" required style="width:100%;">
+                            <option value="">-- Select Material Type --</option>
+                            <?php foreach ($material_types as $key => $label): ?>
+                                <option value="<?php echo $key; ?>"><?php echo $label; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="helper-text">
+                            <i class="fas fa-info-circle"></i> Select the category that best describes this material
+                        </div>
+                    </div>
+
+                    <div class="form-row-two">
+                        <div class="form-group">
+                            <label for="mqty"><i class="fas fa-sort-numeric-up"></i> Quantity *</label>
+                            <input type="number" id="mqty" name="mqty" required placeholder="Enter quantity" min="0" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label for="munit"><i class="fas fa-ruler"></i> Unit of Measurement *</label>
+                            <select id="munit" name="munit" required style="width:100%;">
+                                <option value="">-- Select Unit --</option>
+                                <option value="pcs">Pieces (pcs)</option>
+                                <option value="meter">Meters (m)</option>
+                                <option value="centimeter">Centimeters (cm)</option>
+                                <option value="kilogram">Kilograms (kg)</option>
+                                <option value="gram">Grams (g)</option>
+                                <option value="liter">Liters (L)</option>
+                                <option value="milliliter">Milliliters (mL)</option>
+                                <option value="square meter">Square Meters (m²)</option>
+                                <option value="cubic meter">Cubic Meters (m³)</option>
+                                <option value="roll">Rolls</option>
+                                <option value="sheet">Sheets</option>
+                                <option value="set">Sets</option>
+                                <option value="box">Boxes</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="type-preview" id="typePreview">
+                        <span style="font-weight: 600;">Selected Type:</span>
+                        <span id="selectedTypeDisplay" style="font-weight: 400;"></span>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" style="width:100%; margin-top: 0.5rem;">
+                        <i class="fas fa-plus-circle"></i> Add New Material
+                    </button>
+                </form>
+            </div>
+
+            <!-- ===== TAB 2: ADD TO EXISTING MATERIAL ===== -->
+            <div id="tab-existing" class="tab-content">
+                <form action="insert-material.php" method="POST">
+                    <input type="hidden" name="action_type" value="existing">
+
+                    <div class="form-group">
+                        <label for="existing_material"><i class="fas fa-box"></i> Select Material *</label>
+                        <select id="existing_material" name="existing_material" required style="width:100%;" onchange="updateStockInfo()">
+                            <option value="">-- Select Material --</option>
+                            <?php foreach ($existing_materials as $m): ?>
+                                <option value="<?php echo $m['mid']; ?>" data-mname="<?php echo htmlspecialchars($m['mname']); ?>" data-mqty="<?php echo $m['mqty']; ?>" data-munit="<?php echo $m['munit']; ?>">
+                                    <?php echo htmlspecialchars($m['mname']); ?> (Current: <?php echo $m['mqty']; ?> <?php echo $m['munit']; ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="stock-display" id="stockDisplay">
+                            <i class="fas fa-info-circle"></i> Select a material to see current stock
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="additional_qty"><i class="fas fa-plus"></i> Quantity to Add *</label>
+                        <input type="number" id="additional_qty" name="additional_qty" required placeholder="Enter quantity to add" min="1">
+                        <div class="helper-text">
+                            <i class="fas fa-info-circle"></i> This quantity will be added to the current stock
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-success" style="width:100%; margin-top: 0.5rem;">
+                        <i class="fas fa-plus"></i> Add to Material
+                    </button>
+                </form>
+            </div>
+
+            <!-- ===== QUICK REFERENCE ===== -->
             <div class="quick-ref">
                 <h4><i class="fas fa-list"></i> Common Material Types</h4>
                 <div class="badge-container">
@@ -552,7 +724,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
-    // Show type preview when user selects a type
+    // ===== TAB SWITCHING =====
+    function switchTab(tab) {
+        // Update tab buttons
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            if (btn.textContent.toLowerCase().includes(tab === 'new' ? 'new material' : 'add to existing')) {
+                btn.classList.add('active');
+            }
+        });
+
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    // ===== TYPE PREVIEW =====
     document.getElementById('mtype').addEventListener('change', function() {
         const preview = document.getElementById('typePreview');
         const display = document.getElementById('selectedTypeDisplay');
@@ -565,6 +752,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             preview.classList.remove('show');
         }
     });
+
+    // ===== STOCK INFO DISPLAY =====
+    function updateStockInfo() {
+        const select = document.getElementById('existing_material');
+        const display = document.getElementById('stockDisplay');
+        const selectedOption = select.options[select.selectedIndex];
+
+        if (select.value) {
+            const mname = selectedOption.dataset.mname;
+            const mqty = selectedOption.dataset.mqty;
+            const munit = selectedOption.dataset.munit;
+            display.innerHTML = `
+                <i class="fas fa-box"></i>
+                <strong>${mname}</strong>:
+                Current stock is <strong>${mqty}</strong> ${munit}
+            `;
+            display.style.background = '#e6f4ea';
+            display.style.color = '#2d6a4f';
+        } else {
+            display.innerHTML = `<i class="fas fa-info-circle"></i> Select a material to see current stock`;
+            display.style.background = '';
+            display.style.color = '';
+        }
+    }
 </script>
 
 <footer>
