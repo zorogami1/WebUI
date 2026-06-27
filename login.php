@@ -24,38 +24,76 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($conn->connect_error) {
             $error_message = "Database connection failure: " . $conn->connect_error;
         } else {
-            // Prepared statement to safely lookup the user by their name or email
-            $stmt = $conn->prepare("SELECT id, full_name, password, role FROM users WHERE full_name = ? OR email = ?");
-            $stmt->bind_param("ss", $username, $username);
+            $user_found = false;
+            $user_data = null;
+            $role = '';
+
+            // First, check if user is a CUSTOMER
+            $stmt = $conn->prepare("SELECT cid as id, cname as full_name, cpassword as password, 'customer' as role FROM customers WHERE cname = ?");
+            $stmt->bind_param("s", $username);
             $stmt->execute();
             $result = $stmt->get_result();
 
-            if ($result->num_rows === 0) {
-                // User not found - show error instead of auto-creating
+            if ($result->num_rows === 1) {
+                $user_data = $result->fetch_assoc();
+                $user_found = true;
+                $role = 'customer';
+            }
+            $stmt->close();
+
+            // If not found as customer, check if user is STAFF
+            if (!$user_found) {
+                $stmt = $conn->prepare("SELECT sid as id, sname as full_name, spassword as password, 'staff' as role FROM staffs WHERE sname = ? OR semail = ?");
+                $stmt->bind_param("ss", $username, $username);
+                $stmt->execute();
+                $result = $stmt->get_result();
+
+                if ($result->num_rows === 1) {
+                    $user_data = $result->fetch_assoc();
+                    $user_found = true;
+                    $role = 'staff';
+                }
+                $stmt->close();
+            }
+
+            // If user not found in either table
+            if (!$user_found) {
                 $error_message = "No account found with this username or email. Please register first.";
             } else {
-                // If user is found, grab their actual row array properties
-                $row = $result->fetch_assoc();
+                // Verify the password (plain text comparison for your database)
+                if ($password === $user_data['password']) {
+                    // Store session data
+                    $_SESSION['user_id'] = intval($user_data['id']);
+                    $_SESSION['full_name'] = $user_data['full_name'];
+                    $_SESSION['role'] = $role;
 
-                // Verify the password security hash
-                if (password_verify($password, $row['password'])) {
-                    // DYNAMIC ASSIGNMENT: Pulling the exact real ID from the database row record
-                    $_SESSION['user_id'] = intval($row['id']);
-                    $_SESSION['full_name'] = $row['full_name'];
-                    $_SESSION['role'] = $row['role'];
-
-                    // ===== ROLE-BASED REDIRECT =====
-                    if ($row['role'] === 'staff') {
-                        header("Location: staff/dashboard.php");
+                    // ===== FIXED: ROLE-BASED REDIRECT with absolute paths =====
+                    if ($role === 'staff') {
+                        // Try multiple path options
+                        if (file_exists(__DIR__ . '/staff/dashboard.php')) {
+                            header("Location: staff/dashboard.php");
+                        } elseif (file_exists(__DIR__ . '/../staff/dashboard.php')) {
+                            header("Location: ../staff/dashboard.php");
+                        } else {
+                            // Fallback - use full URL
+                            header("Location: /WebUI/staff/dashboard.php");
+                        }
                     } else {
-                        header("Location: customer/dashboard.php");
+                        // Try multiple path options for customer
+                        if (file_exists(__DIR__ . '/customer/dashboard.php')) {
+                            header("Location: customer/dashboard.php");
+                        } elseif (file_exists(__DIR__ . '/../customer/dashboard.php')) {
+                            header("Location: ../customer/dashboard.php");
+                        } else {
+                            // Fallback - use full URL
+                            header("Location: /WebUI/customer/dashboard.php");
+                        }
                     }
                     exit();
                 } else {
                     $error_message = "Invalid password. Please try again.";
                 }
             }
-            $stmt->close();
             $conn->close();
         }
     } else {
@@ -72,7 +110,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        /* ===== COMPLETE LOGIN STYLES - MATCHING REGISTER UI ===== */
+        /* ===== COMPLETE LOGIN STYLES ===== */
         :root {
             --wood-dark: #3e2a21;
             --wood-medium: #5c3d2e;
@@ -136,7 +174,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             font-size: 0.9rem;
         }
 
-        /* ===== FORM ===== */
         .form-group {
             margin-bottom: 1.2rem;
         }
@@ -182,7 +219,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-top: 0.2rem;
         }
 
-        /* ===== BUTTONS ===== */
         .btn-login {
             width: 100%;
             background: var(--wood-medium);
@@ -212,7 +248,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             transform: scale(0.98);
         }
 
-        /* ===== ALERTS ===== */
         .alert {
             padding: 0.7rem 1rem;
             border-radius: 0.8rem;
@@ -234,7 +269,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border: 1px solid #2d6a4f;
         }
 
-        /* ===== FOOTER ===== */
         .form-footer {
             text-align: center;
             margin-top: 1.5rem;
@@ -254,7 +288,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             text-decoration: underline;
         }
 
-        /* ===== DIVIDER ===== */
         .divider {
             display: flex;
             align-items: center;
@@ -272,7 +305,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background: var(--input-border);
         }
 
-        /* ===== RESPONSIVE ===== */
         @media (max-width: 600px) {
             .login-container {
                 padding: 1.5rem;

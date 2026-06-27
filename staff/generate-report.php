@@ -5,8 +5,9 @@ if (session_status() === PHP_SESSION_NONE) {
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-if (!isset($_SESSION['sid'])) {
-    header("Location: login.php");
+// ===== FIXED: Check for user_id and staff role =====
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
+    header("Location: ../login.php");
     exit();
 }
 
@@ -306,6 +307,190 @@ function exportPDF() {
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <link rel="stylesheet" href="../css/styles.css">
     <style>
+        :root {
+            --wood-dark: #3e2a21;
+            --wood-medium: #5c3d2e;
+            --wood-light: #8b5e3c;
+            --wood-bg: #f5efe6;
+            --cream: #fdf8f0;
+            --accent-gold: #d4a373;
+            --gray-wood: #a89f91;
+            --shadow-soft: 0 8px 30px rgba(0,0,0,0.08);
+            --shadow-warm: 0 12px 28px rgba(62, 42, 33, 0.12);
+            --radius-card: 1.25rem;
+            --radius-btn: 2rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--wood-bg);
+            color: var(--wood-dark);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* ===== NAVBAR ===== */
+        .navbar {
+            background: var(--wood-dark);
+            padding: 0.8rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            border-bottom: 3px solid var(--accent-gold);
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            font-size: 1.3rem;
+            margin: 0;
+        }
+
+        .logo a {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo a i {
+            color: var(--accent-gold);
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .nav-links a:hover {
+            background: rgba(212, 163, 115, 0.2);
+            color: var(--accent-gold);
+        }
+
+        .nav-links a.active {
+            background: rgba(212, 163, 115, 0.15);
+            color: var(--accent-gold);
+        }
+
+        /* ===== CARD ===== */
+        .card {
+            background: white;
+            border-radius: var(--radius-card);
+            box-shadow: var(--shadow-soft);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.2rem 2rem;
+            border-bottom: 2px solid var(--accent-gold);
+            background: var(--cream);
+        }
+
+        .card-header h2 {
+            font-size: 1.3rem;
+            color: var(--wood-dark);
+            font-family: 'Playfair Display', serif;
+            margin: 0;
+        }
+
+        .card-header h2 i {
+            color: var(--accent-gold);
+            margin-right: 0.5rem;
+        }
+
+        /* ===== FILTER BAR ===== */
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-top: 1rem;
+        }
+
+        .filter-select {
+            padding: 0.6rem 1.2rem;
+            border: 1.5px solid var(--gray-wood);
+            border-radius: var(--radius-btn);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
+            background: white;
+            color: var(--wood-dark);
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .filter-select:focus {
+            border-color: var(--accent-gold);
+            box-shadow: 0 0 0 3px rgba(212, 163, 115, 0.15);
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            display: inline-block;
+            padding: 0.6rem 1.5rem;
+            border: none;
+            border-radius: var(--radius-btn);
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            text-align: center;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-primary {
+            background: var(--accent-gold);
+            color: var(--wood-dark);
+        }
+
+        .btn-primary:hover {
+            background: #c49363;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(212, 163, 115, 0.4);
+        }
+
+        .btn-success {
+            background: #2a9d8f;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #21867a;
+            transform: translateY(-2px);
+        }
+
         .btn-pdf {
             background: linear-gradient(135deg, #dc3545, #c82333);
             color: white;
@@ -313,32 +498,204 @@ function exportPDF() {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.7rem 1.6rem;
-            border-radius: 2rem;
+            padding: 0.6rem 1.5rem;
+            border-radius: var(--radius-btn);
             font-weight: 600;
             transition: all 0.3s ease;
             border: none;
             cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.9rem;
         }
+
         .btn-pdf:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(220, 53, 69, 0.4);
             color: white;
         }
-        .btn-pdf i { font-size: 1.1rem; }
+
+        .btn-pdf i {
+            font-size: 1.1rem;
+        }
+
+        /* ===== STATS GRID ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            padding: 1.5rem 2rem;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: var(--radius-card);
+            text-align: center;
+            box-shadow: var(--shadow-soft);
+            transition: all 0.3s;
+            border-left: 5px solid var(--accent-gold);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-warm);
+        }
+
+        .stat-card .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--wood-dark);
+        }
+
+        .stat-card .stat-label {
+            color: var(--wood-light);
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-top: 0.3rem;
+        }
+
+        .stat-card .stat-label i {
+            color: var(--accent-gold);
+            margin-right: 0.3rem;
+        }
+
+        /* ===== CHART ===== */
+        .chart-container {
+            padding: 1.5rem 2rem;
+        }
+
+        /* ===== TABLE ===== */
+        .table-container {
+            overflow-x: auto;
+            padding: 0;
+        }
+
+        .table-container table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table-container thead {
+            background: var(--wood-dark);
+            color: white;
+        }
+
+        .table-container th {
+            padding: 0.8rem 1.2rem;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .table-container td {
+            padding: 0.8rem 1.2rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            color: var(--wood-dark);
+            font-size: 0.9rem;
+        }
+
+        .table-container tbody tr:hover {
+            background: rgba(212, 163, 115, 0.05);
+        }
+
+        .table-container tfoot td {
+            font-weight: 700;
+            font-size: 1rem;
+            background: var(--cream);
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+            background: var(--wood-dark);
+            color: rgba(255,255,255,0.7);
+            text-align: center;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border-top: 3px solid var(--accent-gold);
+        }
+
+        footer i {
+            color: var(--accent-gold);
+            margin-right: 0.5rem;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                text-align: center;
+                padding: 0.8rem 1rem;
+            }
+
+            .nav-links {
+                justify-content: center;
+                gap: 0.3rem;
+            }
+
+            .nav-links a {
+                font-size: 0.75rem;
+                padding: 0.2rem 0.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                padding: 1rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+            }
+
+            .card-header h2 {
+                font-size: 1.1rem;
+            }
+
+            .filter-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-bar .btn,
+            .filter-bar .btn-pdf,
+            .filter-bar .filter-select {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .chart-container {
+                padding: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 1rem;
+            }
+
+            .stats-grid {
+                gap: 1rem;
+            }
+
+            .stat-card .stat-number {
+                font-size: 2rem;
+            }
+        }
     </style>
 </head>
 <body>
 <nav class="navbar">
-    <div class="logo"><h1><a href="dashboard.php"><i class="fas fa-tree"></i> Staff Portal</a></h1></div>
+    <div class="logo">
+        <h1><a href="dashboard.php"><i class="fas fa-tree"></i> Staff Portal</a></h1>
+    </div>
     <ul class="nav-links">
-        <li><a href="dashboard.php">Dashboard</a></li>
-        <li><a href="insert-furniture.php">Insert Furniture</a></li>
-        <li><a href="insert-material.php">Insert Material</a></li>
-        <li><a href="manage-orders.php">Manage Orders</a></li>
-        <li><a href="generate-report.php" class="active">Generate Report</a></li>
-        <li><a href="delete-furniture.php">Delete Furniture</a></li>
-        <li><a href="login.php">Logout</a></li>
+        <li><a href="dashboard.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+        <li><a href="insert-furniture.php"><i class="fas fa-plus-circle"></i> Insert Furniture</a></li>
+        <li><a href="insert-material.php"><i class="fas fa-warehouse"></i> Insert Material</a></li>
+        <li><a href="manage-orders.php"><i class="fas fa-clipboard-list"></i> Manage Orders</a></li>
+        <li><a href="generate-report.php" class="active"><i class="fas fa-file-alt"></i> Generate Report</a></li>
+        <li><a href="delete-furniture.php"><i class="fas fa-trash"></i> Delete Furniture</a></li>
+        <li><a href="../index.php?action=logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
     </ul>
 </nav>
 
@@ -380,21 +737,32 @@ function exportPDF() {
         <div class="chart-container">
             <canvas id="revenueChart" height="250"></canvas>
         </div>
+    </div>
 
-        <div class="card">
-            <div class="card-header"><h2><i class="fas fa-receipt"></i> Transaction Details</h2></div>
-            <div class="table-container">
-                <table id="reportTable">
-                    <thead><tr><th>Order ID</th><th>Date</th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
-                    <tbody id="reportBody"></tbody>
-                    <tfoot>
-                    <tr style="background:#f5efe6;">
-                        <td colspan="5" style="text-align:right;"><strong>Grand Total:</strong></td>
-                        <td id="grandTotal">$0</td>
-                    </tr>
-                    </tfoot>
-                </table>
-            </div>
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-receipt"></i> Transaction Details</h2>
+        </div>
+        <div class="table-container">
+            <table id="reportTable">
+                <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Date</th>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Unit Price</th>
+                    <th>Total</th>
+                </tr>
+                </thead>
+                <tbody id="reportBody"></tbody>
+                <tfoot>
+                <tr>
+                    <td colspan="5" style="text-align:right;"><strong>Grand Total:</strong></td>
+                    <td id="grandTotal">$0</td>
+                </tr>
+                </tfoot>
+            </table>
         </div>
     </div>
 </div>
@@ -474,6 +842,16 @@ function exportPDF() {
                             color: '#3e2a21'
                         }
                     }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
                 }
             }
         });
@@ -502,6 +880,8 @@ function exportPDF() {
     // Auto-refresh on load
     refreshReport();
 </script>
-<footer><p>&copy; 2026 Premium Living | Data-Driven Craftsmanship</p></footer>
+<footer>
+    <p>&copy; 2026 Premium Living | Data-Driven Craftsmanship</p>
+</footer>
 </body>
 </html>

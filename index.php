@@ -191,8 +191,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
             <?php endif; ?>
             <li><a href="index.php?action=logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
         <?php else: ?>
-            <li><a href="staff/register.html"><i class="fas fa-user-plus"></i> Register</a></li>
-            <li><a href="customer/login.php"><i class="fas fa-sign-in-alt"></i> Portal Login</a></li>
+            <li><a href="register.php"><i class="fas fa-user-plus"></i> Register</a></li>
+            <li><a href="login.php"><i class="fas fa-sign-in-alt"></i> Portal Login</a></li>
         <?php endif; ?>
     </ul>
 </nav>
@@ -217,8 +217,8 @@ if (isset($_GET['action']) && $_GET['action'] === 'logout') {
                     <h1 class="hero-title">Handcrafted <span>Wooden Furniture</span><br>For Generations</h1>
                     <p class="hero-desc">Every piece tells a story. Sustainably sourced solid wood, traditional joinery, and timeless designs that bring warmth to your home.</p>
                     <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-                        <a href="staff/register.html" class="btn btn-primary" style="background: var(--accent-gold); color: var(--wood-dark);"><i class="fas fa-user-plus"></i> Join Us / Register</a>
-                        <a href="customer/login.php" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;"><i class="fas fa-sign-in-alt"></i> Member Login</a>
+                        <a href="register.php" class="btn btn-primary" style="background: var(--accent-gold); color: var(--wood-dark);"><i class="fas fa-user-plus"></i> Join Us / Register</a>
+                        <a href="login.php" class="btn btn-secondary" style="background: rgba(255,255,255,0.15); color: white;"><i class="fas fa-sign-in-alt"></i> Member Login</a>
                     </div>
                 <?php endif; ?>
             </div>

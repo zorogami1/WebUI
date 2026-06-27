@@ -5,8 +5,9 @@ if (session_status() === PHP_SESSION_NONE) {
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-if (!isset($_SESSION['sid'])) {
-    header("Location: login.php");
+// ===== FIXED: Check for user_id and staff role =====
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['role']) || $_SESSION['role'] !== 'staff') {
+    header("Location: ../login.php");
     exit();
 }
 
@@ -99,8 +100,269 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Delete Furniture - Premium Living Furniture</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <link rel="stylesheet" href="../css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* ===== COMPLETE STYLES ===== */
+        :root {
+            --wood-dark: #3e2a21;
+            --wood-medium: #5c3d2e;
+            --wood-light: #8b5e3c;
+            --wood-bg: #f5efe6;
+            --cream: #fdf8f0;
+            --accent-gold: #d4a373;
+            --gray-wood: #a89f91;
+            --shadow-soft: 0 8px 30px rgba(0,0,0,0.08);
+            --shadow-warm: 0 12px 28px rgba(62, 42, 33, 0.12);
+            --radius-card: 1.25rem;
+            --radius-btn: 2rem;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--wood-bg);
+            color: var(--wood-dark);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* ===== NAVBAR ===== */
+        .navbar {
+            background: var(--wood-dark);
+            padding: 0.8rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            border-bottom: 3px solid var(--accent-gold);
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            font-size: 1.3rem;
+            margin: 0;
+        }
+
+        .logo a {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo a i {
+            color: var(--accent-gold);
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 0.4rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            padding: 0.3rem 0.6rem;
+            border-radius: 6px;
+            transition: all 0.3s;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .nav-links a:hover {
+            background: rgba(212, 163, 115, 0.2);
+            color: var(--accent-gold);
+        }
+
+        .nav-links a.active {
+            background: rgba(212, 163, 115, 0.15);
+            color: var(--accent-gold);
+        }
+
+        /* ===== CARD ===== */
+        .card {
+            background: white;
+            border-radius: var(--radius-card);
+            box-shadow: var(--shadow-soft);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .card-header {
+            padding: 1.2rem 2rem;
+            border-bottom: 2px solid var(--accent-gold);
+            background: var(--cream);
+        }
+
+        .card-header h2 {
+            font-size: 1.3rem;
+            color: var(--wood-dark);
+            font-family: 'Playfair Display', serif;
+            margin: 0;
+        }
+
+        .card-header h2 i {
+            color: var(--accent-gold);
+            margin-right: 0.5rem;
+        }
+
+        .card-header p {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        /* ===== TABLE ===== */
+        .table-container {
+            overflow-x: auto;
+            padding: 0;
+        }
+
+        .table-container table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .table-container thead {
+            background: var(--wood-dark);
+            color: white;
+        }
+
+        .table-container th {
+            padding: 0.8rem 1.2rem;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .table-container td {
+            padding: 0.8rem 1.2rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            color: var(--wood-dark);
+            font-size: 0.9rem;
+        }
+
+        .table-container tbody tr:hover {
+            background: rgba(212, 163, 115, 0.05);
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            display: inline-block;
+            padding: 0.5rem 1.2rem;
+            border: none;
+            border-radius: var(--radius-btn);
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-size: 0.85rem;
+            text-align: center;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-primary {
+            background: var(--accent-gold);
+            color: var(--wood-dark);
+        }
+
+        .btn-primary:hover {
+            background: #c49363;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #cc0000;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #a00000;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: var(--gray-wood);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: var(--wood-light);
+            transform: translateY(-2px);
+        }
+
+        .btn-warning {
+            background: #e76f51;
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background: #d45a3a;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn:disabled:hover {
+            transform: none;
+        }
+
+        /* ===== BADGES ===== */
+        .delivered-badge {
+            background-color: #e6f4ea;
+            color: #137333;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .pending-badge {
+            background-color: #fef7e0;
+            color: #b06000;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .status-icons {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .status-icons i {
+            font-size: 1.1rem;
+        }
+
+        /* ===== MODAL ===== */
         .modal {
             display: none;
             position: fixed;
@@ -112,6 +374,7 @@ try {
             background-color: rgba(0,0,0,0.5);
             backdrop-filter: blur(3px);
         }
+
         .modal-content {
             background-color: #fefefe;
             margin: 15% auto;
@@ -121,6 +384,7 @@ try {
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
+
         .close {
             float: right;
             font-size: 28px;
@@ -129,52 +393,113 @@ try {
             color: #999;
             transition: color 0.2s;
         }
+
         .close:hover {
             color: #cc0000;
         }
-        .delivered-badge {
-            background-color: #e6f4ea;
-            color: #137333;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            display: inline-block;
-        }
-        .pending-badge {
-            background-color: #fef7e0;
-            color: #b06000;
-            padding: 2px 10px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            display: inline-block;
-        }
-        .status-icons {
+
+        /* ===== LEGEND ===== */
+        .legend {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: var(--cream);
+            border-radius: 8px;
             display: flex;
-            gap: 0.5rem;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
         }
-        .status-icons i {
-            font-size: 1.1rem;
+
+        .legend-color {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
         }
-        .fa-check-circle { color: #137333; }
-        .fa-clock { color: #b06000; }
-        .fa-times-circle { color: #cc0000; }
+
+        /* ===== FOOTER ===== */
+        footer {
+            background: var(--wood-dark);
+            color: rgba(255,255,255,0.7);
+            text-align: center;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            border-top: 3px solid var(--accent-gold);
+        }
+
+        footer i {
+            color: var(--accent-gold);
+            margin-right: 0.5rem;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 768px) {
+            .navbar {
+                flex-direction: column;
+                text-align: center;
+                padding: 0.8rem 1rem;
+            }
+
+            .nav-links {
+                justify-content: center;
+                gap: 0.3rem;
+            }
+
+            .nav-links a {
+                font-size: 0.75rem;
+                padding: 0.2rem 0.5rem;
+            }
+
+            .card-header {
+                padding: 1rem;
+            }
+
+            .card-header h2 {
+                font-size: 1.1rem;
+            }
+
+            .modal-content {
+                width: 90%;
+                margin: 30% auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 0 1rem;
+            }
+
+            .status-icons {
+                flex-direction: column;
+                gap: 0.2rem;
+            }
+
+            .legend {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
     </style>
 </head>
 <body>
 <nav class="navbar">
-    <div class="logo"><h1><a href="dashboard.php">🏠 Staff Portal</a></h1></div>
+    <div class="logo">
+        <h1><a href="dashboard.php"><i class="fas fa-tree"></i> Staff Portal</a></h1>
+    </div>
     <ul class="nav-links">
-        <li><a href="dashboard.php">Dashboard</a></li>
-        <li><a href="insert-furniture.php">Insert Furniture</a></li>
-        <li><a href="insert-material.php">Insert Material</a></li>
-        <li><a href="manage-orders.php">Manage Orders</a></li>
-        <li><a href="generate-report.php">Generate Report</a></li>
-        <li><a href="delete-furniture.php" class="active">Delete Furniture</a></li>
-        <li><a href="login.php">Logout</a></li>
+        <li><a href="dashboard.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+        <li><a href="insert-furniture.php"><i class="fas fa-plus-circle"></i> Insert Furniture</a></li>
+        <li><a href="insert-material.php"><i class="fas fa-warehouse"></i> Insert Material</a></li>
+        <li><a href="manage-orders.php"><i class="fas fa-clipboard-list"></i> Manage Orders</a></li>
+        <li><a href="generate-report.php"><i class="fas fa-file-alt"></i> Generate Report</a></li>
+        <li><a href="delete-furniture.php" class="active"><i class="fas fa-trash"></i> Delete Furniture</a></li>
+        <li><a href="../index.php?action=logout"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
     </ul>
 </nav>
 
@@ -294,7 +619,7 @@ try {
                                         Has delivered orders
                                     </div>
                                 <?php elseif ($has_orders): ?>
-                                    <button class="btn btn-warning" onclick="confirmDelete(<?php echo $f['fid']; ?>, '<?php echo addslashes($f['fname']); ?>', '<?php echo $f['pending_count']; ?>')">
+                                    <button class="btn btn-warning" onclick="confirmDelete(<?php echo $f['fid']; ?>, '<?php echo addslashes($f['fname']); ?>', <?php echo $f['pending_count']; ?>)">
                                         <i class="fas fa-exclamation-triangle"></i> Delete (Pending)
                                     </button>
                                     <div style="font-size: 0.7rem; color: #b06000; margin-top: 3px;">
@@ -314,10 +639,16 @@ try {
         </div>
 
         <!-- Legend -->
-        <div style="margin-top: 1.5rem; padding: 1rem; background: #f5efe6; border-radius: 8px; display: flex; gap: 2rem; flex-wrap: wrap;">
-            <div><span style="display: inline-block; width: 12px; height: 12px; background: #e8f5e9; border-radius: 3px;"></span> No orders (can delete)</div>
-            <div><span style="display: inline-block; width: 12px; height: 12px; background: #fff8e7; border-radius: 3px;"></span> Has pending orders (delete with caution)</div>
-            <div><span style="display: inline-block; width: 12px; height: 12px; background: #fce4e4; border-radius: 3px;"></span> Has delivered orders (cannot delete)</div>
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-color" style="background: #e8f5e9;"></span> No orders (can delete)
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #fff8e7;"></span> Has pending orders (delete with caution)
+            </div>
+            <div class="legend-item">
+                <span class="legend-color" style="background: #fce4e4;"></span> Has delivered orders (cannot delete)
+            </div>
         </div>
     </div>
 </div>
