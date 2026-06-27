@@ -31,39 +31,80 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// ===== FIXED: Updated column names for new database =====
 // Process Profile Form Updates
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $full_name = trim($_POST['full_name']);
-    $email = trim($_POST['email']);
-    $phone = trim($_POST['phone']);  // Changed from contact_number
+    $phone = trim($_POST['phone']);
     $delivery_address = trim($_POST['delivery_address']);
+    $current_password = $_POST['current_password'] ?? '';
+    $new_password = $_POST['new_password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
 
     // Validation
-    if (empty($full_name) || empty($email) || empty($phone) || empty($delivery_address)) {
+    if (empty($full_name) || empty($phone) || empty($delivery_address)) {
         $message = "Please fill in all required fields.";
         $message_type = "alert-warning";
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message = "Please enter a valid email address.";
-        $message_type = "alert-warning";
     } else {
-        // Check if email is already used by another user
-        $check_stmt = $conn->prepare("SELECT cid FROM customers WHERE ctel = ? AND cid != ?");
-        $check_stmt->bind_param("si", $email, $user_id);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
+        // Check if password update is requested
+        $password_update = false;
+        if (!empty($current_password) || !empty($new_password) || !empty($confirm_password)) {
+            // Validate password fields
+            if (empty($current_password)) {
+                $message = "Please enter your current password to update it.";
+                $message_type = "alert-warning";
+            } elseif (empty($new_password)) {
+                $message = "Please enter a new password.";
+                $message_type = "alert-warning";
+            } elseif (strlen($new_password) < 6) {
+                $message = "New password must be at least 6 characters long.";
+                $message_type = "alert-warning";
+            } elseif ($new_password !== $confirm_password) {
+                $message = "New passwords do not match!";
+                $message_type = "alert-warning";
+            } else {
+                // Verify current password
+                $stmt = $conn->prepare("SELECT cpassword FROM customers WHERE cid = ?");
+                $stmt->bind_param("i", $user_id);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $user_data = $result->fetch_assoc();
+                $stmt->close();
 
-        if ($check_result->num_rows > 0) {
-            $message = "Email address is already used by another account.";
-            $message_type = "alert-warning";
-        } else {
-            // Update with correct column names for customers table
-            $stmt = $conn->prepare("UPDATE customers SET cname = ?, ctel = ?, caddr = ? WHERE cid = ?");
-            $stmt->bind_param("sssi", $full_name, $phone, $delivery_address, $user_id);
+                // Check if password matches (plain text or hashed)
+                $password_valid = false;
+                if (password_verify($current_password, $user_data['cpassword'])) {
+                    $password_valid = true;
+                } elseif ($current_password === $user_data['cpassword']) {
+                    $password_valid = true;
+                }
+
+                if ($password_valid) {
+                    $password_update = true;
+                    $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                } else {
+                    $message = "Current password is incorrect.";
+                    $message_type = "alert-warning";
+                }
+            }
+        }
+
+        // If no errors, proceed with update
+        if (empty($message)) {
+            // Prepare update query
+            if ($password_update) {
+                $stmt = $conn->prepare("UPDATE customers SET cname = ?, ctel = ?, caddr = ?, cpassword = ? WHERE cid = ?");
+                $stmt->bind_param("ssssi", $full_name, $phone, $delivery_address, $hashed_password, $user_id);
+            } else {
+                $stmt = $conn->prepare("UPDATE customers SET cname = ?, ctel = ?, caddr = ? WHERE cid = ?");
+                $stmt->bind_param("sssi", $full_name, $phone, $delivery_address, $user_id);
+            }
 
             if ($stmt->execute()) {
                 $_SESSION['full_name'] = $full_name;
                 $message = "Profile updated successfully!";
+                if ($password_update) {
+                    $message .= " Password has been changed.";
+                }
                 $message_type = "alert-success";
             } else {
                 $message = "Failed to update profile: " . $conn->error;
@@ -71,11 +112,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             }
             $stmt->close();
         }
-        $check_stmt->close();
     }
 }
 
-// ===== FIXED: Read current fields from customers table =====
+// Read current fields from customers table
 $stmt = $conn->prepare("SELECT cname as full_name, ctel as phone, caddr as delivery_address FROM customers WHERE cid = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -275,6 +315,57 @@ $conn->close();
             margin-top: 0.2rem;
         }
 
+        /* ===== PASSWORD FIELD WITH TOGGLE ===== */
+        .password-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .password-wrapper input {
+            padding-right: 45px;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--gray-wood);
+            cursor: pointer;
+            font-size: 1.1rem;
+            padding: 5px;
+            transition: color 0.3s;
+        }
+
+        .password-toggle:hover {
+            color: var(--accent-gold);
+        }
+
+        /* ===== SECTION DIVIDER ===== */
+        .section-divider {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 1.5rem 0 1rem;
+            color: var(--wood-light);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .section-divider::before,
+        .section-divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--input-border);
+        }
+
+        .section-divider i {
+            color: var(--accent-gold);
+        }
+
         /* ===== BUTTONS ===== */
         .btn {
             display: inline-block;
@@ -434,6 +525,11 @@ $conn->close();
 
         <div class="card-body">
             <form action="" method="POST">
+                <!-- Personal Information -->
+                <div class="section-divider">
+                    <i class="fas fa-user-circle"></i> Personal Information
+                </div>
+
                 <div class="form-group">
                     <label for="full_name"><i class="fas fa-user"></i> Full Name <span class="required">*</span></label>
                     <input type="text" id="full_name" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
@@ -449,6 +545,43 @@ $conn->close();
                     <textarea id="delivery_address" name="delivery_address" rows="4" required><?php echo htmlspecialchars($user['delivery_address'] ?? ''); ?></textarea>
                 </div>
 
+                <!-- Password Change Section -->
+                <div class="section-divider">
+                    <i class="fas fa-lock"></i> Change Password
+                </div>
+
+                <div class="form-group">
+                    <label for="current_password"><i class="fas fa-key"></i> Current Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="current_password" name="current_password" placeholder="Enter current password">
+                        <button type="button" class="password-toggle" onclick="togglePassword('current_password', this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="helper-text">Required only if changing password</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="new_password"><i class="fas fa-lock"></i> New Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="new_password" name="new_password" placeholder="Enter new password (min 6 characters)">
+                        <button type="button" class="password-toggle" onclick="togglePassword('new_password', this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="helper-text">Leave blank to keep current password</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirm_password"><i class="fas fa-check-circle"></i> Confirm New Password</label>
+                    <div class="password-wrapper">
+                        <input type="password" id="confirm_password" name="confirm_password" placeholder="Confirm new password">
+                        <button type="button" class="password-toggle" onclick="togglePassword('confirm_password', this)">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;">
                     <i class="fas fa-save"></i> Update Profile
                 </button>
@@ -460,5 +593,24 @@ $conn->close();
 <footer>
     <p>&copy; 2026 Premium Living | Woodcraft Excellence</p>
 </footer>
+
+<script>
+    // ===== TOGGLE PASSWORD VISIBILITY =====
+    function togglePassword(inputId, button) {
+        const input = document.getElementById(inputId);
+        const icon = button.querySelector('i');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+</script>
+
 </body>
 </html>
