@@ -23,14 +23,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $delivery_address = ($role === 'customer') ? trim($_POST['delivery_address']) : null;
     $date_of_birth = ($role === 'customer') ? trim($_POST['date_of_birth']) : null;
 
-    // Staff-only fields
-    $id_number = ($role === 'staff') ? trim($_POST['id_number']) : null;
-    $bank_name = ($role === 'staff') ? trim($_POST['bank_name']) : null;
-    $bank_account = ($role === 'staff') ? trim($_POST['bank_account']) : null;
-    $emergency_contact = ($role === 'staff') ? trim($_POST['emergency_contact']) : null;
-    $emergency_phone = ($role === 'staff') ? trim($_POST['emergency_phone']) : null;
-    $certifications = ($role === 'staff') ? trim($_POST['certifications']) : null;
-
     // Validation Checks
     if (empty($full_name) || empty($email) || empty($password) || empty($confirm_password) || empty($phone)) {
         $error_message = "Please fill out all required fields.";
@@ -42,63 +34,73 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $error_message = "Password must be at least 6 characters long.";
     } elseif ($role === 'customer' && empty($delivery_address)) {
         $error_message = "Delivery address is required for customers.";
-    } elseif ($role === 'staff' && empty($id_number)) {
-        $error_message = "ID number is required for staff members.";
     } else {
         // Secure Password Hashing
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
         try {
-            // Check if user already exists
-            $check_sql = "SELECT id FROM users WHERE email = :email OR full_name = :full_name";
-            $check_stmt = $pdo->prepare($check_sql);
-            $check_stmt->execute([':email' => $email, ':full_name' => $full_name]);
+            if ($role === 'customer') {
+                // ===== INSERT INTO CUSTOMERS TABLE =====
+                // Check if customer already exists
+                $check_sql = "SELECT cid FROM customers WHERE cname = :full_name OR ctel = :phone";
+                $check_stmt = $pdo->prepare($check_sql);
+                $check_stmt->execute([':full_name' => $full_name, ':phone' => $phone]);
 
-            if ($check_stmt->rowCount() > 0) {
-                $error_message = "User with this email or name already exists.";
-            } else {
-                // Insert statement
-                $sql = "INSERT INTO users (
-                    full_name, email, password, phone, role, 
-                    delivery_address, date_of_birth, 
-                    id_number, bank_name, bank_account, 
-                    emergency_contact, emergency_phone, certifications
-                ) VALUES (
-                    :full_name, :email, :password, :phone, :role,
-                    :delivery_address, :date_of_birth,
-                    :id_number, :bank_name, :bank_account,
-                    :emergency_contact, :emergency_phone, :certifications
-                )";
-
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute([
-                        ':full_name' => $full_name,
-                        ':email' => $email,
-                        ':password' => $hashed_password,
-                        ':phone' => $phone,
-                        ':role' => $role,
-                        ':delivery_address' => $delivery_address,
-                        ':date_of_birth' => $date_of_birth,
-                        ':id_number' => $id_number,
-                        ':bank_name' => $bank_name,
-                        ':bank_account' => $bank_account,
-                        ':emergency_contact' => $emergency_contact,
-                        ':emergency_phone' => $emergency_phone,
-                        ':certifications' => $certifications
-                ]);
-
-                $success_message = "Registration successful!";
-
-                // Auto-login after registration
-                $_SESSION['user_id'] = $pdo->lastInsertId();
-                $_SESSION['full_name'] = $full_name;
-                $_SESSION['role'] = $role;
-
-                // Redirect based on role
-                if ($role === 'staff') {
-                    echo "<script>setTimeout(() => { window.location.href = 'staff/dashboard.php'; }, 1500);</script>";
+                if ($check_stmt->rowCount() > 0) {
+                    $error_message = "User with this name or phone already exists.";
                 } else {
+                    // Insert into customers table
+                    $sql = "INSERT INTO customers (cname, cpassword, ctel, caddr) 
+                            VALUES (:full_name, :password, :phone, :delivery_address)";
+
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                            ':full_name' => $full_name,
+                            ':password' => $hashed_password,
+                            ':phone' => $phone,
+                            ':delivery_address' => $delivery_address
+                    ]);
+
+                    $success_message = "Registration successful!";
+
+                    // Auto-login after registration
+                    $_SESSION['user_id'] = $pdo->lastInsertId();
+                    $_SESSION['full_name'] = $full_name;
+                    $_SESSION['role'] = 'customer';
+
+                    // Redirect to customer dashboard
                     echo "<script>setTimeout(() => { window.location.href = 'customer/dashboard.php'; }, 1500);</script>";
+                }
+            } else {
+                // ===== INSERT INTO STAFFS TABLE =====
+                // Check if staff already exists
+                $check_sql = "SELECT sid FROM staffs WHERE sname = :full_name OR semail = :email";
+                $check_stmt = $pdo->prepare($check_sql);
+                $check_stmt->execute([':full_name' => $full_name, ':email' => $email]);
+
+                if ($check_stmt->rowCount() > 0) {
+                    $error_message = "Staff with this name or email already exists.";
+                } else {
+                    // Insert into staffs table - using same fields
+                    $sql = "INSERT INTO staffs (sname, semail, spassword) 
+                            VALUES (:full_name, :email, :password)";
+
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute([
+                            ':full_name' => $full_name,
+                            ':email' => $email,
+                            ':password' => $hashed_password
+                    ]);
+
+                    $success_message = "Staff registration successful!";
+
+                    // Auto-login after registration
+                    $_SESSION['user_id'] = $pdo->lastInsertId();
+                    $_SESSION['full_name'] = $full_name;
+                    $_SESSION['role'] = 'staff';
+
+                    // Redirect to staff dashboard
+                    echo "<script>setTimeout(() => { window.location.href = 'staff/dashboard.php'; }, 1500);</script>";
                 }
             }
         } catch (PDOException $e) {
@@ -125,6 +127,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             --cream: #fdf8f0;
             --accent-gold: #d4a373;
             --input-border: #d4c4a8;
+            --gray-wood: #a89f91;
             --radius-card: 1.25rem;
             --radius-btn: 2rem;
             --shadow-soft: 0 8px 30px rgba(0,0,0,0.08);
@@ -151,7 +154,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border-radius: 2rem;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
             width: 100%;
-            max-width: 680px;
+            max-width: 580px;
             padding: 2.5rem;
             box-sizing: border-box;
             max-height: 90vh;
@@ -568,8 +571,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
 
             <div class="form-group" id="dob_group">
-                <label for="date_of_birth"><i class="fas fa-calendar-alt"></i> Date of Birth <span class="required">*</span></label>
+                <label for="date_of_birth"><i class="fas fa-calendar-alt"></i> Date of Birth</label>
                 <input type="date" id="date_of_birth" name="date_of_birth" value="<?php echo isset($_POST['date_of_birth']) ? htmlspecialchars($_POST['date_of_birth']) : ''; ?>">
+                <div class="helper-text">Optional for customers</div>
             </div>
         </div>
 
@@ -610,39 +614,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
 
             <div class="form-group">
-                <label for="id_number"><i class="fas fa-id-card"></i> Government ID Number <span class="required">*</span></label>
-                <input type="text" id="id_number" name="id_number" placeholder="Enter your ID number (e.g., HKID)" value="<?php echo isset($_POST['id_number']) ? htmlspecialchars($_POST['id_number']) : ''; ?>">
-                <div class="helper-text">Government-issued ID (e.g., Hong Kong Identity Card)</div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="bank_name"><i class="fas fa-university"></i> Bank Name</label>
-                    <input type="text" id="bank_name" name="bank_name" placeholder="Enter bank name" value="<?php echo isset($_POST['bank_name']) ? htmlspecialchars($_POST['bank_name']) : ''; ?>">
+                <label><i class="fas fa-info-circle"></i> Staff Registration</label>
+                <div style="padding: 0.7rem 1rem; background: var(--wood-bg); border-radius: 0.8rem; color: var(--wood-light); font-size: 0.9rem;">
+                    <i class="fas fa-check-circle" style="color: var(--accent-gold);"></i>
+                    You are registering as a staff member. Your email and phone will be used for staff records.
                 </div>
-
-                <div class="form-group">
-                    <label for="bank_account"><i class="fas fa-dollar-sign"></i> Bank Account Number</label>
-                    <input type="text" id="bank_account" name="bank_account" placeholder="Enter account number" value="<?php echo isset($_POST['bank_account']) ? htmlspecialchars($_POST['bank_account']) : ''; ?>">
-                </div>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="emergency_contact"><i class="fas fa-user-friends"></i> Emergency Contact Name</label>
-                    <input type="text" id="emergency_contact" name="emergency_contact" placeholder="Emergency contact name" value="<?php echo isset($_POST['emergency_contact']) ? htmlspecialchars($_POST['emergency_contact']) : ''; ?>">
-                </div>
-
-                <div class="form-group">
-                    <label for="emergency_phone"><i class="fas fa-phone-alt"></i> Emergency Phone</label>
-                    <input type="tel" id="emergency_phone" name="emergency_phone" placeholder="Emergency phone number" value="<?php echo isset($_POST['emergency_phone']) ? htmlspecialchars($_POST['emergency_phone']) : ''; ?>">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="certifications"><i class="fas fa-certificate"></i> Certifications / Credentials</label>
-                <textarea id="certifications" name="certifications" placeholder="List your relevant certifications, licenses, or credentials" rows="2"><?php echo isset($_POST['certifications']) ? htmlspecialchars($_POST['certifications']) : ''; ?></textarea>
-                <div class="helper-text">Professional certifications, licenses, or relevant credentials</div>
             </div>
         </div>
 
@@ -669,27 +645,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             staffFields.classList.remove('active');
             // Make customer fields required
             document.getElementById('delivery_address').required = true;
-            document.getElementById('date_of_birth').required = true;
-            // Make staff fields not required
-            document.getElementById('id_number').required = false;
-            document.getElementById('bank_name').required = false;
-            document.getElementById('bank_account').required = false;
-            document.getElementById('emergency_contact').required = false;
-            document.getElementById('emergency_phone').required = false;
-            document.getElementById('certifications').required = false;
+            document.getElementById('date_of_birth').required = false;
+            // Show DOB group
+            dobGroup.style.display = 'block';
         } else {
             customerFields.classList.remove('active');
             staffFields.classList.add('active');
             // Make customer fields not required
             document.getElementById('delivery_address').required = false;
             document.getElementById('date_of_birth').required = false;
-            // Make staff fields required
-            document.getElementById('id_number').required = true;
-            document.getElementById('bank_name').required = false;
-            document.getElementById('bank_account').required = false;
-            document.getElementById('emergency_contact').required = false;
-            document.getElementById('emergency_phone').required = false;
-            document.getElementById('certifications').required = false;
+            // Hide DOB group
+            dobGroup.style.display = 'none';
         }
     }
 
