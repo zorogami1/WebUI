@@ -60,8 +60,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if (!$user_found) {
                 $error_message = "No account found with this username or email. Please register first.";
             } else {
-                // ===== FIXED: Use password_verify() for hashed passwords =====
+                // ===== FIXED: Support BOTH hashed and plain text passwords =====
+                $password_valid = false;
+
+                // First try: password_verify() for hashed passwords
                 if (password_verify($password, $user_data['password'])) {
+                    $password_valid = true;
+                }
+                // Second try: Plain text comparison for old passwords
+                elseif ($password === $user_data['password']) {
+                    // If plain text password matches, re-hash it for security
+                    $password_valid = true;
+
+                    // Update the password to hashed version
+                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                    if ($role === 'customer') {
+                        $update_stmt = $conn->prepare("UPDATE customers SET cpassword = ? WHERE cid = ?");
+                    } else {
+                        $update_stmt = $conn->prepare("UPDATE staffs SET spassword = ? WHERE sid = ?");
+                    }
+                    $update_stmt->bind_param("si", $hashed_password, $user_data['id']);
+                    $update_stmt->execute();
+                    $update_stmt->close();
+                }
+
+                if ($password_valid) {
                     // Store session data
                     $_SESSION['user_id'] = intval($user_data['id']);
                     $_SESSION['full_name'] = $user_data['full_name'];

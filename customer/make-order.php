@@ -19,8 +19,13 @@ $message_type = "";
 $user_id = $_SESSION['user_id'];
 $full_name = $_SESSION['full_name'] ?? 'Valued Customer';
 
-// ===== USE conn.php =====
+// ===== FIXED: Properly include conn.php and check if $pdo exists =====
 require_once '../conn.php';
+
+// Check if $pdo is defined
+if (!isset($pdo)) {
+    die("Database connection failed. Please check your configuration.");
+}
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['action'] === 'place_order') {
     $fid = intval($_POST['fid']);
@@ -66,7 +71,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             $message_type = "alert-warning";
         }
     } catch (PDOException $e) {
-        $pdo->rollBack();
+        if (isset($pdo)) {
+            $pdo->rollBack();
+        }
         $message = "Error creating order: " . $e->getMessage();
         $message_type = "alert-warning";
     }
@@ -290,7 +297,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             margin-bottom: 0.3rem;
             font-family: 'Playfair Display', serif;
             line-height: 1.3;
-            /* No height limit - text wraps naturally */
         }
 
         .product-price {
@@ -306,7 +312,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             font-size: 0.9rem;
             margin-bottom: 1rem;
             line-height: 1.5;
-            /* No height limit - text wraps naturally */
         }
 
         /* ===== FIXED META AND BUTTON AREA ===== */
@@ -389,7 +394,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             margin: 0;
         }
 
-        /* ===== FIXED BUY NOW BUTTON ===== */
         .order-form .btn {
             flex: 1;
             min-width: 0;
@@ -421,16 +425,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
             background: #c49363;
             transform: translateY(-2px);
             box-shadow: 0 4px 15px rgba(212, 163, 115, 0.4);
-        }
-
-        .btn-secondary {
-            background: var(--gray-wood);
-            color: white;
-        }
-
-        .btn-secondary:hover {
-            background: var(--wood-light);
-            transform: translateY(-2px);
         }
 
         /* ===== ALERTS ===== */
@@ -591,6 +585,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
         <div class="product-grid">
             <?php
             try {
+                // Check if $pdo exists before using it
+                if (!isset($pdo)) {
+                    throw new Exception("Database connection not available");
+                }
+
                 $products = $pdo->query("SELECT fid, fname, fdesc, fprice, fimage FROM furnitures ORDER BY fid ASC");
 
                 while ($p = $products->fetch(PDO::FETCH_ASSOC)):
@@ -640,13 +639,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                                 <div class="product-meta">
                                     <span><i class="fas fa-tag"></i> SKU: #<?php echo $p['fid']; ?></span>
                                 </div>
-                                <form action="" method="POST" class="order-form">
+                                <form action="" method="POST" class="order-form" onsubmit="return validateQuantity(this)">
                                     <input type="hidden" name="action" value="place_order">
                                     <input type="hidden" name="fid" value="<?php echo $p['fid']; ?>">
                                     <div class="qty-wrapper">
-                                        <button type="button" onclick="this.nextElementSibling.stepDown();">−</button>
-                                        <input type="number" name="quantity" value="1" min="1" max="10">
-                                        <button type="button" onclick="this.previousElementSibling.stepUp();">+</button>
+                                        <button type="button" class="qty-btn" data-action="minus">−</button>
+                                        <input type="number" name="quantity" class="qty-input" value="1" min="1" max="10">
+                                        <button type="button" class="qty-btn" data-action="plus">+</button>
                                     </div>
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-cart-plus"></i> Buy Now
@@ -656,7 +655,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
                         </div>
                     </div>
                 <?php endwhile;
-            } catch (PDOException $e) {
+            } catch (Exception $e) {
                 echo "<div class='alert alert-warning'>Error loading products: " . $e->getMessage() . "</div>";
             }
             ?>
@@ -669,31 +668,57 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['action']) && $_POST['a
 </footer>
 
 <script>
-    // Quantity button functionality
+    // ===== FIXED: Quantity button functionality =====
     document.querySelectorAll('.qty-wrapper').forEach(wrapper => {
-        const input = wrapper.querySelector('input[type="number"]');
+        const input = wrapper.querySelector('.qty-input');
         const max = parseInt(input.getAttribute('max')) || 10;
+        const min = parseInt(input.getAttribute('min')) || 1;
 
-        wrapper.querySelectorAll('button').forEach(btn => {
-            btn.addEventListener('click', function(e) {
+        // Minus button
+        const minusBtn = wrapper.querySelector('[data-action="minus"]');
+        if (minusBtn) {
+            minusBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                let currentValue = parseInt(input.value) || 1;
-
-                if (this.textContent.includes('−')) {
-                    if (currentValue > 1) {
-                        input.value = currentValue - 1;
-                    }
-                } else if (this.textContent.includes('+')) {
-                    if (currentValue < max) {
-                        input.value = currentValue + 1;
-                    }
+                let currentValue = parseInt(input.value) || min;
+                if (currentValue > min) {
+                    input.value = currentValue - 1;
                 }
-
-                const event = new Event('change', { bubbles: true });
-                input.dispatchEvent(event);
             });
+        }
+
+        // Plus button
+        const plusBtn = wrapper.querySelector('[data-action="plus"]');
+        if (plusBtn) {
+            plusBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                let currentValue = parseInt(input.value) || min;
+                if (currentValue < max) {
+                    input.value = currentValue + 1;
+                }
+            });
+        }
+
+        // Ensure value stays within bounds when user types
+        input.addEventListener('change', function() {
+            let value = parseInt(this.value) || min;
+            if (value < min) this.value = min;
+            if (value > max) this.value = max;
         });
     });
+
+    // Validate quantity before form submission
+    function validateQuantity(form) {
+        const input = form.querySelector('.qty-input');
+        const value = parseInt(input.value) || 1;
+        const max = parseInt(input.getAttribute('max')) || 10;
+        const min = parseInt(input.getAttribute('min')) || 1;
+
+        if (value < min || value > max) {
+            alert('Please enter a quantity between ' + min + ' and ' + max + '.');
+            return false;
+        }
+        return true;
+    }
 </script>
 
 </body>
